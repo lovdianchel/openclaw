@@ -1,12 +1,10 @@
+import { stripMixedSilentReplyTokens } from "../../../auto-reply/reply/mixed-silent-reply-tokens.js";
 import { parseReplyDirectivesFromMedia } from "../../../auto-reply/reply/reply-directives-core.js";
 import { generateSecureToken } from "../../../infra/secure-random.js";
 import type { AssistantMessage } from "../../../llm/types.js";
 import { splitMediaOutput } from "../../../media/parse-output.js";
-import { extractAssistantTextForPhase } from "../../../shared/chat-message-content.js";
-import {
-  extractAssistantVisibleText,
-  extractEmbeddedAssistantText,
-} from "../../embedded-agent-utils.js";
+import { readAssistantTextBlocksForPhase } from "../../../shared/chat-message-content.js";
+import { extractAssistantVisibleText } from "../../embedded-agent-utils.js";
 import {
   deriveContextPromptTokens,
   hasNonzeroUsage,
@@ -180,12 +178,14 @@ export function resolveFinalAssistantVisibleText(
     return undefined;
   }
   const message = parseReplyDirectivesFromMedia(
-    splitMediaOutput(extractEmbeddedAssistantText(lastAssistant)),
+    splitMediaOutput(
+      lastAssistant.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join(""),
+    ),
   );
   const visibleText = message.hasSilentIntent
     ? message.text.trim()
     : extractAssistantVisibleText(lastAssistant).trim();
-  return visibleText || undefined;
+  return (stripMixedSilentReplyTokens(visibleText) ?? visibleText) || undefined;
 }
 
 /**
@@ -212,7 +212,13 @@ export function resolveFinalAssistantRawText(
   if (!lastAssistant) {
     return undefined;
   }
-  const finalAnswerText = extractAssistantTextForPhase(lastAssistant, { phase: "final_answer" });
-  const rawText = (finalAnswerText ?? extractAssistantTextForPhase(lastAssistant) ?? "").trim();
+  const finalAnswerBlocks = readAssistantTextBlocksForPhase(lastAssistant, "final_answer");
+  const blocks = finalAnswerBlocks.length
+    ? finalAnswerBlocks
+    : readAssistantTextBlocksForPhase(lastAssistant);
+  const rawText = blocks
+    .map((block) => block.text)
+    .join("")
+    .trim();
   return rawText || undefined;
 }

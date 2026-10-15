@@ -91,7 +91,7 @@ describe("resolveFinalAssistantVisibleText", () => {
     const assistant = makeAssistantMessage([
       {
         type: "text",
-        text: "The earlier answer.",
+        text: "The earlier answer.\n",
         textSignature: JSON.stringify({ v: 1, id: "answer", phase: "final_answer" }),
       },
       {
@@ -102,6 +102,15 @@ describe("resolveFinalAssistantVisibleText", () => {
     ]);
     expect(resolveFinalAssistantVisibleText(assistant)).toBeUndefined();
     expect(resolveFinalAssistantRawText(assistant)).toBe("The earlier answer.");
+  });
+
+  it.each([
+    { parts: ["Mention ", "NO_REPLY"], visible: "Mention", raw: "Mention NO_REPLY" },
+    { parts: ["Reasoning.", "\n", "NO_REPLY"], visible: undefined, raw: "Reasoning.\nNO_REPLY" },
+  ])("classifies literal text-block boundaries: $parts", ({ parts, visible, raw }) => {
+    const assistant = makeAssistantMessage(parts.map((text) => ({ type: "text", text })));
+    expect(resolveFinalAssistantVisibleText(assistant)).toBe(visible);
+    expect(resolveFinalAssistantRawText(assistant)).toBe(raw);
   });
 
   it("returns undefined when the final visible text is empty", () => {
