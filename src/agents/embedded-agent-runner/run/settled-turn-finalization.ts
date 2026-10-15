@@ -13,6 +13,7 @@ import {
 } from "../../../config/sessions/transcript-write-context.js";
 import { formatErrorMessage } from "../../../infra/errors.js";
 import { appendAssistantMirrorMessageByIdentity } from "../../../plugin-sdk/session-transcript-runtime.js";
+import { extractAssistantAuthoredText } from "../../../shared/chat-message-content.js";
 import { resolveAdmittedRunActiveAssertion } from "../../admitted-run-context.js";
 import { classifyAgentRunTerminalOutcome } from "../../agent-run-terminal-outcome.js";
 import { buildTextObservationFields } from "../../embedded-agent-error-observation.js";
@@ -20,7 +21,6 @@ import {
   formatUserFacingAssistantErrorText,
   GENERIC_ASSISTANT_ERROR_TEXT,
 } from "../../embedded-agent-helpers/error-text.js";
-import { extractEmbeddedAssistantText } from "../../embedded-agent-utils.js";
 import { runAgentHarnessSettledTurnFinalization } from "../../harness/selection.js";
 import { resolveSettledTurnFinalizationText } from "../../harness/settled-turn-finalization-result.js";
 import type {
@@ -489,7 +489,7 @@ function buildSettledTurnFinalizationAttemptResult(input: {
   runtimePlan?: EmbeddedRunAttemptParams["runtimePlan"];
 }): EmbeddedRunAttemptWithReceiptEvidence {
   const { result, settledAttempt } = input;
-  const authoredText = extractEmbeddedAssistantText(result.assistant);
+  const authoredText = extractAssistantAuthoredText(result.assistant);
   const text =
     input.outcome === "empty"
       ? parseReplyDirectives(authoredText).hasSilentIntent

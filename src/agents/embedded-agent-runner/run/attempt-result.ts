@@ -3,12 +3,14 @@ import { parseReplyDirectives } from "../../../auto-reply/reply/reply-directives
 import { freezeDiagnosticTraceContext } from "../../../infra/diagnostic-trace-context.js";
 import { isTransientNetworkError } from "../../../infra/retryable-network-errors.js";
 import { hasReplyPayloadContent } from "../../../interactive/payload.js";
-import { extractAssistantTranscriptSourceText } from "../../../shared/chat-message-content.js";
+import {
+  extractAssistantAuthoredText,
+  extractAssistantTranscriptSourceText,
+} from "../../../shared/chat-message-content.js";
 import { projectAgentRunAttemptTerminal } from "../../agent-run-terminal-outcome.js";
 import { isCloudCodeAssistFormatError } from "../../embedded-agent-helpers.js";
 import type { CompletedAssistantAnswer } from "../../embedded-agent-subscribe.handlers.types.js";
 import type { subscribeEmbeddedAgentSession } from "../../embedded-agent-subscribe.js";
-import { extractEmbeddedAssistantText } from "../../embedded-agent-utils.js";
 import {
   INCOMPLETE_ASSISTANT_STREAM_RE,
   TERMINATED_TRANSPORT_MESSAGE_RE,
@@ -256,7 +258,7 @@ export function completeEmbeddedAttemptResult(
   // after every other tool result; an empty stop after it is the reply.
   const terminalAssistant = state.currentAttemptAssistant;
   const closingText = terminalAssistant
-    ? extractEmbeddedAssistantText(terminalAssistant).trim()
+    ? extractAssistantAuthoredText(terminalAssistant).trim()
     : "";
   const progressIsReply =
     subscription.endsWithSourceProgress() &&

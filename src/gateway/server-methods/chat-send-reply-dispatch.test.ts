@@ -73,6 +73,21 @@ function interceptDeliverySnapshot(afterRead: () => void) {
 }
 
 describe("chat delivery watermark preparation", () => {
+  it("counts adjacent inline control-token text as an accepted answer", async () => {
+    await withOpenClawTestState({ label: "chat-authored-inline-answer" }, async () => {
+      const { dispatch, append } = await createReplyTranscriptFixture();
+      dispatch.captureAgentTranscriptStart();
+      await append("answer", {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Mention " },
+          { type: "text", text: "NO_REPLY" },
+        ],
+      });
+      expect(await dispatch.resolveReplyDelivery()).toBe("delivered");
+    });
+  });
+
   it.each(["rewrite", "replacement"] as const)(
     "reads released durable reply facts through history and rejects the old answer after %s",
     async (change) => {

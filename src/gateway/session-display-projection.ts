@@ -1,15 +1,22 @@
 import { flattenMarkdownToPlainText } from "@openclaw/normalization-core/markdown-plain-text";
 import { asOptionalRecord as readRecord } from "@openclaw/normalization-core/record-coerce";
 import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
+import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 import type { SessionPreviewItem } from "../config/sessions/session-history-read.types.js";
 import { projectAssistantDisplayContent } from "../shared/assistant-display-content.js";
 import { stripEnvelope } from "../shared/chat-envelope.js";
-import { extractAssistantPhaseText } from "../shared/chat-message-content.js";
+import {
+  extractAssistantAuthoredText,
+  extractAssistantPhaseText,
+} from "../shared/chat-message-content.js";
 import {
   stripAssistantMediaDirectivesForDisplay,
   takeAssistantManagedMediaUrlsForDisplay,
 } from "./chat-display-projection.helpers.js";
-import { isSuppressedControlReplyText } from "./control-reply-text.js";
+import {
+  isSuppressedControlReplyText,
+  stripSuppressedControlReplyToken,
+} from "./control-reply-text.js";
 
 const SESSION_LAST_MESSAGE_PREVIEW_DEFAULT_CHARS = 240;
 const SESSION_DISPLAY_PROJECTION_MAX_CHARS = 800;
@@ -66,7 +73,9 @@ export function projectSessionDisplayMessage(
       : entry;
   const extracted =
     role === "assistant" ? extractAssistantPhaseText(projectedEntry) : extractUserText(entry);
-  let text = extracted;
+  const authoredReply =
+    role === "assistant" ? parseReplyDirectives(extractAssistantAuthoredText(entry)) : undefined;
+  let text = authoredReply?.hasSilentIntent ? authoredReply.text : extracted;
   if (text && role === "assistant" && options.view !== "model-context") {
     text = stripAssistantMediaDirectivesForDisplay(
       text,
@@ -74,7 +83,10 @@ export function projectSessionDisplayMessage(
     );
   }
   text = text?.trim();
-  if (!text || (role === "assistant" && isSuppressedControlReplyText(text))) {
+  if (text && authoredReply) {
+    text = stripSuppressedControlReplyToken(text, isSuppressedControlReplyText(authoredReply.text));
+  }
+  if (!text) {
     return null;
   }
   if (role === "user") {

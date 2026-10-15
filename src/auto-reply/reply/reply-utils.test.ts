@@ -6,7 +6,7 @@ import type { ReplyPayload } from "../types.js";
 import { createBlockReplyCoalescer } from "./block-reply-coalescer.js";
 import { matchesMentionWithExplicit } from "./mentions.js";
 import { normalizeReplyPayload, normalizeReplyPayloadOutcome } from "./normalize-reply.js";
-import { parseReplyDirectives } from "./reply-directives.js";
+import { parseReplyDirectives, parseReplyDirectivesForMessage } from "./reply-directives.js";
 import { createReplyDispatcherWithTyping } from "./reply-dispatcher.js";
 import { createReplyReferencePlanner } from "./reply-reference.js";
 import {
@@ -50,6 +50,18 @@ describe("matchesMentionWithExplicit", () => {
     expect(matchesMentionWithExplicit({ text: "", mentionRegexes: [/.*/i] })).toBe(true);
     expect(matchesMentionWithExplicit({ text: "", mentionRegexes: [/\bopenclaw\b/i] })).toBe(false);
   });
+});
+
+describe("message directive authority", () => {
+  it.each(["Mention\nNO_REPLY", "Mention\nNO_REPLY\nMEDIA:https://example.com/image.png"])(
+    "does not infer silence from display separators: %s",
+    (selected) => {
+      const parsed = parseReplyDirectivesForMessage("Mention NO_REPLY", selected);
+      expect(parsed.text).toBe("Mention");
+      expect(parsed.hasSilentIntent).toBe(false);
+      expect(parsed.isSilent).toBe(false);
+    },
+  );
 });
 
 describe("normalizeReplyPayload", () => {

@@ -5,6 +5,7 @@ import {
 } from "../../utils/directive-tags.js";
 import { appendReplyMediaFailures, type ReplyMediaFailure } from "../reply-payload.js";
 import { isSilentReplyPayloadText, SILENT_REPLY_TOKEN } from "../tokens.js";
+import { stripMixedSilentReplyTokens } from "./mixed-silent-reply-tokens.js";
 
 export type ReplyDirectiveParseResult = {
   text: string;
@@ -25,6 +26,7 @@ export function parseReplyDirectivesFromMedia(
   options: {
     currentMessageId?: string;
     silentToken?: string;
+    silentIntent?: boolean;
     preserveTrailingWhitespace?: boolean;
   } = {},
 ): ReplyDirectiveParseResult {
@@ -43,7 +45,10 @@ export function parseReplyDirectivesFromMedia(
   }).text;
 
   const silentToken = options.silentToken ?? SILENT_REPLY_TOKEN;
-  const isSilent = isSilentReplyPayloadText(text, silentToken);
+  const isSilent = options.silentIntent ?? isSilentReplyPayloadText(text, silentToken);
+  if (options.silentIntent === false) {
+    text = stripMixedSilentReplyTokens(text, silentToken) ?? text;
+  }
   const mediaFailures = Array.from(
     { length: split.rejectedMediaCount ?? 0 },
     (): ReplyMediaFailure => ({

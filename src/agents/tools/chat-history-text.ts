@@ -3,7 +3,10 @@ import { parseReplyDirectivesFromMedia } from "../../auto-reply/reply/reply-dire
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import { splitMediaOutput } from "../../media/parse-output.js";
 import { NESTED_TOOL_ACTIVITY_CUSTOM_TYPE } from "../../sessions/nested-tool-activity.js";
-import { extractAssistantTextForPhase } from "../../shared/chat-message-content.js";
+import {
+  extractAssistantAuthoredText,
+  extractAssistantTextForPhase,
+} from "../../shared/chat-message-content.js";
 import { sanitizeAssistantVisibleTextWithProfile } from "../../shared/text/assistant-visible-text.js";
 import { sanitizeUserFacingText } from "../embedded-agent-helpers/sanitize-user-facing-text.js";
 import { renderUserFacingText } from "../embedded-agent-helpers/user-facing-text.js";
@@ -31,24 +34,7 @@ export function extractStoredAssistantText(message: unknown): string | undefined
   if (entry?.role !== "assistant") {
     return undefined;
   }
-  const content = typeof entry.text === "string" ? entry.text : entry.content;
-  const rawText =
-    typeof content === "string"
-      ? content
-      : Array.isArray(content)
-        ? content
-            .flatMap((value) => {
-              const block = asOptionalObjectRecord(value);
-              return block &&
-                (block.type === "text" ||
-                  block.type === "input_text" ||
-                  block.type === "output_text") &&
-                typeof block.text === "string"
-                ? [block.text]
-                : [];
-            })
-            .join("")
-        : "";
+  const rawText = extractAssistantAuthoredText(entry);
   // Classify authored order before phase selection can revive a withdrawn answer.
   const parsed = parseReplyDirectivesFromMedia(splitMediaOutput(rawText));
   if (parsed.hasSilentIntent) {

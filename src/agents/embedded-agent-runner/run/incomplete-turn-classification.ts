@@ -7,8 +7,8 @@ import {
 } from "../../../auto-reply/reply/reply-directives.js";
 import type { AssistantMessage } from "../../../llm/types.js";
 import { resolveRawAssistantAnswerText } from "../../../shared/assistant-answer-text.js";
+import { extractAssistantAuthoredText } from "../../../shared/chat-message-content.js";
 import type { CompletedAssistantAnswer } from "../../embedded-agent-subscribe.handlers.types.js";
-import { extractEmbeddedAssistantText } from "../../embedded-agent-utils.js";
 import {
   isStrictAgenticSupportedProviderModel,
   stripProviderPrefix,
@@ -56,7 +56,7 @@ export type IncompleteTurnAttempt = Pick<
 
 function readAssistantSnapshotText(message: AgentMessage): string {
   return message.role === "assistant"
-    ? parseReplyDirectives(extractEmbeddedAssistantText(message)).text.trim()
+    ? parseReplyDirectives(extractAssistantAuthoredText(message)).text.trim()
     : "";
 }
 
@@ -96,7 +96,7 @@ export function hasComposedVisibleAnswerAfterSettledTools(params: {
         (message) =>
           message.role === "assistant" &&
           parseReplyDirectivesForMessage(
-            extractEmbeddedAssistantText(message),
+            extractAssistantAuthoredText(message),
             resolveRawAssistantAnswerText(message),
           ).text.trim().length > 0,
       )
@@ -249,7 +249,7 @@ export function classifyAssistantTurn(params: {
   const assistant = resolveCurrentAttemptAssistant(params.attempt);
   const output = assistant
     ? parseReplyDirectivesForMessage(
-        extractEmbeddedAssistantText(assistant),
+        extractAssistantAuthoredText(assistant),
         resolveRawAssistantAnswerText(assistant),
       )
     : parseReplyDirectives(joinAssistantTexts(params.attempt.assistantTexts));

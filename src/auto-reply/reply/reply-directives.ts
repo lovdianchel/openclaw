@@ -15,7 +15,7 @@ export function parseReplyDirectivesForMessage(
   const message = parseReplyDirectives(messageText);
   return message.hasSilentIntent || messageText === selectedText
     ? message
-    : { ...parseReplyDirectives(selectedText), hasSilentIntent: false };
+    : parseReplyDirectives(selectedText, { silentIntent: false });
 }
 
 export function parseReplyDirectives(
@@ -23,6 +23,7 @@ export function parseReplyDirectives(
   options: {
     currentMessageId?: string;
     silentToken?: string;
+    silentIntent?: boolean;
     extractMarkdownImages?: boolean;
     extractMediaDirectives?: boolean;
     preserveTrailingWhitespace?: boolean;

@@ -100,14 +100,19 @@ describe("assertSettledTurnFinalizationResult", () => {
   });
 
   it.each([
-    { answer: "The earlier answer.", commentary: "NO_REPLY", empty: true },
+    { answer: "The earlier answer.\n", commentary: "NO_REPLY", empty: true },
+    { answer: "The earlier answer.", commentary: "NO_REPLY", empty: false },
     { answer: "NO_REPLY", commentary: "This is still commentary.", empty: true },
     {
-      answer: "The earlier answer.",
+      answer: "The earlier answer.\n",
       commentary: "NO_REPLY\nMEDIA:https://example.com/result.png",
       empty: false,
     },
-    { answer: "The earlier answer.", commentary: "NO_REPLY\nMEDIA:media://inbound/", empty: false },
+    {
+      answer: "The earlier answer.\n",
+      commentary: "NO_REPLY\nMEDIA:media://inbound/",
+      empty: false,
+    },
   ])(
     "resolves full-message intent before selecting the finalizer answer: $answer / $commentary",
     ({ answer, commentary, empty }) => {
@@ -131,10 +136,22 @@ describe("assertSettledTurnFinalizationResult", () => {
         );
       } else {
         expect(assertSettledTurnFinalizationResult(result)).toBe(result);
-        expect(resolveSettledTurnFinalizationText(result)).toBe(`${answer}\n${commentary}`);
+        expect(resolveSettledTurnFinalizationText(result)).toBe(
+          answer.endsWith("\n") ? `${answer}${commentary}` : answer,
+        );
       }
     },
   );
+
+  it("accepts an inline token split across final-answer text blocks", () => {
+    const result = {
+      assistant: assistantMessage([
+        { type: "text", text: "Mention " },
+        { type: "text", text: "NO_REPLY" },
+      ]),
+    };
+    expect(assertSettledTurnFinalizationResult(result)).toBe(result);
+  });
 
   it("rejects an assistant stopped at the length limit", () => {
     expect(() =>

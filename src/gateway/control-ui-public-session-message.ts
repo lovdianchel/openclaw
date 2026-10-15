@@ -2,12 +2,19 @@ import { asOptionalRecord } from "@openclaw/normalization-core/record-coerce";
 import { isHeartbeatOkResponse, isHeartbeatUserMessage } from "../auto-reply/heartbeat-filter.js";
 import { HEARTBEAT_PROMPT } from "../auto-reply/heartbeat.js";
 import { stripInternalMetadataForDisplay } from "../auto-reply/reply/display-text-sanitize.js";
+import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 import { stripUserEnvelopeForDisplay } from "../auto-reply/reply/user-envelope-display.js";
 import { splitMediaOutput } from "../media/parse-output.js";
 import { INTER_SESSION_PROMPT_PREFIX_BASE } from "../sessions/input-provenance.js";
-import { extractAssistantTranscriptSourceText } from "../shared/chat-message-content.js";
+import {
+  extractAssistantAuthoredText,
+  extractAssistantTranscriptSourceText,
+} from "../shared/chat-message-content.js";
 import { sanitizeAssistantVisibleTextWithProfile } from "../shared/text/assistant-visible-text.js";
-import { stripSuppressedControlReplyToken } from "./control-reply-text.js";
+import {
+  isSuppressedControlReplyText,
+  stripSuppressedControlReplyToken,
+} from "./control-reply-text.js";
 
 /** Publication excludes private runtime input, including its attachments and tool activity. */
 export function publicSessionMessageEntry(message: unknown): Record<string, unknown> | undefined {
@@ -35,7 +42,10 @@ export function publicSessionMessageEntry(message: unknown): Record<string, unkn
   if (raw?.includes(INTER_SESSION_PROMPT_PREFIX_BASE)) {
     return undefined;
   }
-  const roleContent = { role: String(entry.role), content: raw ?? "" };
+  const roleContent = {
+    role: String(entry.role),
+    content: entry.role === "assistant" ? extractAssistantAuthoredText(entry) : (raw ?? ""),
+  };
   if (
     raw &&
     (isHeartbeatUserMessage(roleContent, HEARTBEAT_PROMPT) || isHeartbeatOkResponse(roleContent))
@@ -75,6 +85,10 @@ export function publicSessionMessageText(entry: Record<string, unknown>): string
   if (!text) {
     return "";
   }
+  const authoredReply =
+    entry.role === "assistant"
+      ? parseReplyDirectives(extractAssistantAuthoredText(entry))
+      : undefined;
   text =
     entry.role === "user"
       ? stripUserEnvelopeForDisplay(text)
@@ -83,12 +97,15 @@ export function publicSessionMessageText(entry: Record<string, unknown>): string
     // An incomplete reasoning tag must never become public prose during live refresh.
     text = sanitizeAssistantVisibleTextWithProfile(text, "history", true);
   }
-  const roleContent = { role: entry.role, content: text };
+  const roleContent = { role: entry.role, content: authoredReply?.text ?? text };
   if (isHeartbeatUserMessage(roleContent, HEARTBEAT_PROMPT) || isHeartbeatOkResponse(roleContent)) {
     return "";
   }
-  if (entry.role === "assistant") {
-    text = stripSuppressedControlReplyToken(text);
+  if (authoredReply) {
+    text = stripSuppressedControlReplyToken(
+      authoredReply.hasSilentIntent ? authoredReply.text : text,
+      isSuppressedControlReplyText(authoredReply.text),
+    );
   }
   return splitMediaOutput(text, { extractAudioDirectives: false }).text.trim();
 }

@@ -162,7 +162,7 @@ describe("assistant message final-line silence", () => {
         content: [
           {
             type: "text",
-            text: reasoning,
+            text: `${reasoning}\n`,
             ...(phased
               ? { textSignature: JSON.stringify({ v: 1, id: "answer-0", phase: "final_answer" }) }
               : {}),
@@ -203,6 +203,24 @@ describe("assistant message final-line silence", () => {
       );
     },
   );
+
+  it("keeps an inline token split across completed text blocks visible", async () => {
+    const h = setup();
+    h.start();
+    h.delta("Mention ");
+    h.emit({
+      type: "message_end",
+      message: makeAgentAssistantMessage({
+        content: [
+          { type: "text", text: "Mention " },
+          { type: "text", text: "NO_REPLY" },
+        ],
+      }),
+    });
+    await h.subscription.waitForPendingEvents();
+    expect(h.subscription.assistantTexts).toEqual(["Mention"]);
+    expect(h.onBlockReply.mock.calls.at(-1)?.[0].text).toBe("Mention");
+  });
 
   it("keeps commentary after a leading silent final-answer block", async () => {
     const h = setup();
@@ -445,7 +463,7 @@ describe("assistant message final-line silence", () => {
       const thinking = { type: "thinking" as const, thinking: "Private model analysis." };
       const commentary = {
         type: "text" as const,
-        text: "I am considering whether to respond.",
+        text: "I am considering whether to respond.\n",
         textSignature: JSON.stringify({ v: 1, id: "progress", phase: "commentary" }),
       };
       const final = {
@@ -485,7 +503,7 @@ describe("assistant message final-line silence", () => {
       expect(h.onAgentEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           stream: "item",
-          data: expect.objectContaining({ progressText: commentary.text }),
+          data: expect.objectContaining({ progressText: commentary.text.trim() }),
         }),
       );
       h.emit({

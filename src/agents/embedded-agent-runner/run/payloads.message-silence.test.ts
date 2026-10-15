@@ -31,7 +31,7 @@ it.each([
         { type: "thinking", thinking: "Private decision." },
         {
           type: "text",
-          text: "This answer was withdrawn.",
+          text: "This answer was withdrawn.\n",
           textSignature: JSON.stringify({ v: 1, id: "answer", phase: "final_answer" }),
         },
         {
@@ -84,4 +84,16 @@ it("keeps commentary after a selected silent answer out of final payloads", () =
   expect(
     buildPayloads({ assistantTexts: [], lastAssistant: assistant, currentAssistant: assistant }),
   ).toEqual([]);
+});
+
+it("delivers an inline token split across assistant blocks", () => {
+  const assistant = makeAgentAssistantMessage({
+    content: [
+      { type: "text", text: "Mention " },
+      { type: "text", text: "NO_REPLY" },
+    ],
+  });
+  expect(
+    buildPayloads({ assistantTexts: [], lastAssistant: assistant, currentAssistant: assistant }),
+  ).toEqual([expect.objectContaining({ text: "Mention" })]);
 });

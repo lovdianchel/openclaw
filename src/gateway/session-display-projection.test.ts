@@ -1,4 +1,8 @@
 import { describe, expect, test } from "vitest";
+import {
+  publicSessionMessageEntry,
+  publicSessionMessageText,
+} from "./control-ui-public-session-message.js";
 import { projectSessionDisplayMessage } from "./session-display-projection.js";
 
 const SESSION_LAST_MESSAGE_PREVIEW_DEFAULT_CHARS = 240;
@@ -17,6 +21,29 @@ const managedMediaReply = {
 };
 
 describe("projectSessionDisplayMessage", () => {
+  test.each([
+    { name: "inline blocks", parts: ["Mention ", "NO_REPLY"], expected: "Mention" },
+    { name: "authored newline", parts: ["Reasoning.", "\n", "NO_REPLY"], expected: "" },
+  ])("classifies $name before display separators", ({ parts, expected }) => {
+    const message = {
+      role: "assistant",
+      content: parts.map((text) => ({ type: "text", text })),
+    };
+    expect(projectSessionDisplayMessage(message)?.text ?? "").toBe(expected);
+  });
+
+  test.each([
+    { name: "inline blocks", parts: ["Mention ", "NO_REPLY"], expected: "Mention" },
+    { name: "authored newline", parts: ["Reasoning.", "\n", "NO_REPLY"], expected: "" },
+  ])("publishes $name using authored silence", ({ parts, expected }) => {
+    const message = {
+      role: "assistant",
+      content: parts.map((text) => ({ type: "text", text })),
+    };
+    expect(publicSessionMessageEntry(message)).toBe(expected ? message : undefined);
+    expect(publicSessionMessageText(message)).toBe(expected);
+  });
+
   test("keeps visible user and assistant text while excluding non-display rows", () => {
     const messages = [
       { role: "user", content: "Initial request" },

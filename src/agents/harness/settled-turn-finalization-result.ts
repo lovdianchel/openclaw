@@ -1,10 +1,8 @@
 import { parseReplyDirectivesForMessage } from "../../auto-reply/reply/reply-directives.js";
 import { hasReplyPayloadContent } from "../../interactive/payload.js";
+import { resolveRawAssistantAnswerText } from "../../shared/assistant-answer-text.js";
+import { extractAssistantAuthoredText } from "../../shared/chat-message-content.js";
 import { normalizeAgentRunAttemptTerminal } from "../agent-run-terminal-outcome.js";
-import {
-  extractAssistantVisibleText,
-  extractEmbeddedAssistantText,
-} from "../embedded-agent-utils.js";
 import { EmptySettledTurnFinalizationError } from "./settled-turn-finalization-outcome.js";
 import type {
   AgentHarnessAttemptResult,
@@ -65,8 +63,8 @@ export function assertSettledTurnFinalizationResult(
 export function resolveSettledTurnFinalizationText(
   result: AgentHarnessSettledTurnFinalizationResult,
 ): string {
-  const messageText = extractEmbeddedAssistantText(result.assistant);
-  const selectedText = extractAssistantVisibleText(result.assistant).trim();
+  const messageText = extractAssistantAuthoredText(result.assistant);
+  const selectedText = resolveRawAssistantAnswerText(result.assistant).trim();
   const parsed = parseReplyDirectivesForMessage(messageText, selectedText);
   if (!hasReplyPayloadContent(parsed)) {
     throw new EmptySettledTurnFinalizationError(result);

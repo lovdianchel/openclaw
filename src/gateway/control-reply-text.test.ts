@@ -9,6 +9,10 @@ const textBlock = (text: string) => ({ type: "text", text });
 const assistant = (content: unknown) => ({ role: "assistant", content });
 
 describe("control reply display projection", () => {
+  it("keeps an authoritative non-silent decision when cleaning display separators", () => {
+    expect(stripSuppressedControlReplyToken("Mention \nNO_REPLY", false)).toBe("Mention");
+  });
+
   it.each([
     ...[
       "REPLY_SKIP\n\nRE",

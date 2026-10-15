@@ -3,7 +3,10 @@ import { parseReplyDirectivesFromMedia } from "../../../auto-reply/reply/reply-d
 import { generateSecureToken } from "../../../infra/secure-random.js";
 import type { AssistantMessage } from "../../../llm/types.js";
 import { splitMediaOutput } from "../../../media/parse-output.js";
-import { readAssistantTextBlocksForPhase } from "../../../shared/chat-message-content.js";
+import {
+  extractAssistantAuthoredText,
+  readAssistantTextBlocksForPhase,
+} from "../../../shared/chat-message-content.js";
 import { extractAssistantVisibleText } from "../../embedded-agent-utils.js";
 import {
   deriveContextPromptTokens,
@@ -178,9 +181,7 @@ export function resolveFinalAssistantVisibleText(
     return undefined;
   }
   const message = parseReplyDirectivesFromMedia(
-    splitMediaOutput(
-      lastAssistant.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join(""),
-    ),
+    splitMediaOutput(extractAssistantAuthoredText(lastAssistant)),
   );
   const visibleText = message.hasSilentIntent
     ? message.text.trim()

@@ -16,6 +16,28 @@ export function extractFirstTextBlock(message: unknown): string | undefined {
     : undefined;
 }
 
+/** Returns authored text in original block order without introducing separators. */
+export function extractAssistantAuthoredText(message: unknown): string {
+  const entry = asOptionalObjectRecord(message);
+  if (!entry) {
+    return "";
+  }
+  const content = typeof entry.text === "string" ? entry.text : entry.content;
+  if (typeof content === "string") {
+    return content;
+  }
+  let text = "";
+  if (Array.isArray(content)) {
+    for (const value of content) {
+      const block = asOptionalObjectRecord(value);
+      if (block && isAssistantTextContentBlockType(block.type) && typeof block.text === "string") {
+        text += block.text;
+      }
+    }
+  }
+  return text;
+}
+
 export type AssistantPhase = "commentary" | "final_answer";
 type AssistantTextBlock = AssistantTextSignatureBlock &
   Record<string, unknown> & { type: string; text: string };

@@ -1,6 +1,12 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
+import { parseReplyDirectives } from "../../auto-reply/reply/reply-directives.js";
+import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import type { AssistantDeliveryTtsFacts, AssistantMessage } from "../../llm/types.js";
-import { extractAssistantPhaseText } from "../../shared/chat-message-content.js";
+import {
+  extractAssistantAuthoredText,
+  extractAssistantPhaseText,
+  readAssistantTextBlocksForPhase,
+} from "../../shared/chat-message-content.js";
 import type { LatestTranscriptAssistantText } from "./session-accessor.types.js";
 
 type AssistantDeliveryFacts = NonNullable<AssistantMessage["openclawDelivery"]>;
@@ -80,7 +86,18 @@ export function projectAssistantTranscriptText(
   if (!isRecord(message) || message.role !== "assistant") {
     return undefined;
   }
-  const text = extractAssistantPhaseText(message);
+  const authoredReply = parseReplyDirectives(extractAssistantAuthoredText(message));
+  let text: string | undefined;
+  if (authoredReply.hasSilentIntent) {
+    text = authoredReply.text || SILENT_REPLY_TOKEN;
+  } else if (Array.isArray(message.content) && typeof message.text !== "string") {
+    const finalBlocks = readAssistantTextBlocksForPhase(message, "final_answer");
+    text = extractAssistantAuthoredText({
+      content: finalBlocks.length ? finalBlocks : readAssistantTextBlocksForPhase(message),
+    });
+  } else {
+    text = extractAssistantPhaseText(message);
+  }
   if (!text?.trim()) {
     return undefined;
   }

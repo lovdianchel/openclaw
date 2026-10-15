@@ -28,6 +28,7 @@ import type { OpenClawConfig } from "../../../config/types.openclaw.js";
 import { hasReplyPayloadContent } from "../../../interactive/payload.js";
 import type { AssistantMessage } from "../../../llm/types.js";
 import { resolveRawAssistantAnswerText } from "../../../shared/assistant-answer-text.js";
+import { extractAssistantAuthoredText } from "../../../shared/chat-message-content.js";
 import { sanitizeAssistantVisibleText } from "../../../shared/text/assistant-visible-text.js";
 import { trimTextPreservingCode } from "../../../shared/text/text-projection.js";
 import { classifyOAuthRefreshFailure } from "../../auth-profiles/oauth-refresh-failure.js";
@@ -49,7 +50,6 @@ import { isToolAuthoredSourceReplyForAssistant } from "../../embedded-agent-tool
 import {
   extractAssistantThinking,
   extractAssistantVisibleText,
-  extractEmbeddedAssistantText,
 } from "../../embedded-agent-utils.js";
 import { isTimeoutErrorMessage } from "../../failover/classify.js";
 import type { PreparedProviderFailoverOwner } from "../../failover/provider-patterns.js";
@@ -290,7 +290,7 @@ export function buildEmbeddedRunPayloads(params: {
       const fallbackRawAnswerText = resolveRawAssistantAnswerText(assistantForPayload);
       const rawAnswerDirectiveState = assistantForPayload
         ? parseReplyDirectivesForMessage(
-            extractEmbeddedAssistantText(assistantForPayload),
+            extractAssistantAuthoredText(assistantForPayload),
             fallbackRawAnswerText,
           )
         : null;
@@ -302,7 +302,7 @@ export function buildEmbeddedRunPayloads(params: {
         const reasoningIsSilent = (
           terminalAssistant === assistantForPayload
             ? rawAnswerDirectiveState
-            : parseReplyDirectives(extractEmbeddedAssistantText(terminalAssistant))
+            : parseReplyDirectives(extractAssistantAuthoredText(terminalAssistant))
         )?.hasSilentIntent;
         if (!reasoningIsSilent) {
           replyItems.push({ text: reasoningText, isReasoning: true });
@@ -337,7 +337,10 @@ export function buildEmbeddedRunPayloads(params: {
         fallbackAnswerSourceText === fallbackRawAnswerText
           ? rawAnswerDirectiveState
           : fallbackAnswerSourceText
-            ? parseReplyDirectives(fallbackAnswerSourceText)
+            ? parseReplyDirectivesForMessage(
+                extractAssistantAuthoredText(assistantForPayload),
+                fallbackAnswerSourceText,
+              )
             : null;
       const shouldUseCanonicalFinalAnswer = Boolean(
         (fallbackAnswerDirectiveState &&

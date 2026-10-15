@@ -18,6 +18,7 @@ export function resolveRawAssistantAnswerText(message: unknown): string {
   }
   const finalAnswerText = extractAssistantTextForPhase(lastAssistant, {
     phase: "final_answer",
+    joinWith: "",
     sanitizeText: sanitizeAssistantFinalAnswerText,
   });
   if (finalAnswerText) {
@@ -29,12 +30,13 @@ export function resolveRawAssistantAnswerText(message: unknown): string {
     .map((block) => sanitizeAssistantFinalAnswerText(block.text))
     .filter((text) => text.trim());
   if (signedUnphasedParts.length) {
-    return normalizeOptionalString(signedUnphasedParts.join("\n")) ?? "";
+    return normalizeOptionalString(signedUnphasedParts.join("")) ?? "";
   }
   return (
     normalizeOptionalString(
       extractAssistantTextForPhase(lastAssistant, {
         sanitizeText: sanitizeAssistantVisibleText,
+        joinWith: "",
       }),
     ) ?? ""
   );

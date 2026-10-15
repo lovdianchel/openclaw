@@ -45,8 +45,11 @@ export function isSuppressedControlReplyText(text: string): boolean {
 }
 
 /** Remove internal control tokens when a model appends one to visible reply text. */
-export function stripSuppressedControlReplyToken(text: string): string {
-  if (isSuppressedControlReplyText(text)) {
+export function stripSuppressedControlReplyToken(
+  text: string,
+  suppressText = isSuppressedControlReplyText(text),
+): string {
+  if (suppressText) {
     return "";
   }
   let stripped = text;

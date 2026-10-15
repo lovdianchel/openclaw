@@ -15,6 +15,7 @@ import {
   stripReplyMediaFailureFallback,
   type ReplyPayload,
 } from "../../auto-reply/reply-payload.js";
+import { parseReplyDirectives } from "../../auto-reply/reply/reply-directives.js";
 import type { ReplyDispatcherOptions } from "../../auto-reply/reply/reply-dispatcher.js";
 import type { ReplyDispatchOperation } from "../../auto-reply/reply/reply-dispatcher.types.js";
 import { resolveSessionStorePathCore } from "../../config/sessions/paths.js";
@@ -30,6 +31,7 @@ import { createChannelMessageReplyPipeline } from "../../plugin-sdk/channel-outb
 import { readSessionTranscriptRunId } from "../../sessions/transcript-events.js";
 import type { UserTurnTranscriptRecorder } from "../../sessions/user-turn-transcript.js";
 import {
+  extractAssistantAuthoredText,
   extractAssistantPhaseText,
   extractAssistantTextForPhase,
 } from "../../shared/chat-message-content.js";
@@ -270,9 +272,11 @@ export function createChatSendReplyDispatch(params: {
             const answer = hasTools
               ? extractAssistantTextForPhase(message, { phase: "final_answer" })
               : extractAssistantPhaseText(message);
+            const authoredReply = parseReplyDirectives(extractAssistantAuthoredText(message));
             if (
               !answer ||
-              isSuppressedControlReplyText(answer) ||
+              authoredReply.isSilent ||
+              isSuppressedControlReplyText(authoredReply.text) ||
               !extractAssistantPhaseText(projectChatDisplayMessage(message))
             ) {
               continue;

@@ -1,6 +1,7 @@
 import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 import { splitTrailingDirective } from "../auto-reply/reply/streaming-directives.js";
 import type { AssistantMessage } from "../llm/types.js";
+import { extractAssistantAuthoredText } from "../shared/chat-message-content.js";
 import {
   assistantVisibleTextFilters,
   toolCallXmlTextFilter,
@@ -113,6 +114,8 @@ export function extractAssistantStreamSnapshot(
       : visibleBlockSource,
     {
       preserveTrailingWhitespace: true,
+      silentIntent: parseReplyDirectives(extractAssistantAuthoredText(observedMessage))
+        .hasSilentIntent,
       onAudioDirective: () => {
         audioDirectiveCount += 1;
       },

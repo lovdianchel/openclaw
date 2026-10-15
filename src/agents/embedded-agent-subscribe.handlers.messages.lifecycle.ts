@@ -6,7 +6,10 @@ import {
 } from "../auto-reply/reply/reply-directives.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { applyAssistantDeliveryDirectives } from "../config/sessions/transcript-assistant-delivery.js";
-import { resolveAssistantMessagePhase } from "../shared/chat-message-content.js";
+import {
+  extractAssistantAuthoredText,
+  resolveAssistantMessagePhase,
+} from "../shared/chat-message-content.js";
 import {
   recordPendingAssistantReplyDirectives,
   resolveManagedStreamMediaUrls,
@@ -36,7 +39,6 @@ import {
   createThinkingTagStreamState,
   extractAssistantThinking,
   extractAssistantVisibleText,
-  extractEmbeddedAssistantText,
   extractThinkingFromTaggedText,
   promoteThinkingTagsToBlocks,
 } from "./embedded-agent-utils.js";
@@ -121,9 +123,9 @@ export function handleMessageEnd(
   // Only a silent stop below can keep the earlier answer; any other message replaces it.
   ctx.state.keptAnswer = undefined;
   if (suppressVisibleAssistantOutput) {
-    appendRawMessage(() => extractEmbeddedAssistantText(assistantMessage));
+    appendRawMessage(() => extractAssistantAuthoredText(assistantMessage));
     const silent = parseReplyDirectives(
-      extractEmbeddedAssistantText(assistantMessage),
+      extractAssistantAuthoredText(assistantMessage),
     ).hasSilentIntent;
     if (!silent) {
       emitAssistantCommentaryStreamData(ctx, assistantMessage, true);
@@ -146,7 +148,7 @@ export function handleMessageEnd(
   promoteThinkingTagsToBlocks(assistantMessage);
 
   let rawText: string | undefined;
-  const getRawText = () => (rawText ??= extractEmbeddedAssistantText(assistantMessage));
+  const getRawText = () => (rawText ??= extractAssistantAuthoredText(assistantMessage));
   const snapshot = extractAssistantStreamSnapshot(ctx, assistantMessage);
   const rawVisibleText = snapshot.text;
   appendRawMessage(getRawText);
