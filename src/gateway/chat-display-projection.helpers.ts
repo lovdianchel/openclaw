@@ -4,7 +4,10 @@ import {
   asOptionalRecord as readRecord,
 } from "@openclaw/normalization-core/record-coerce";
 import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
-import { parseReplyDirectivesFromMedia } from "../auto-reply/reply/reply-directives-core.js";
+import {
+  parseReplyDirectivesFromMedia,
+  serializeReplyMediaDirective,
+} from "../auto-reply/reply/reply-directives-core.js";
 import { isMeaningfulMediaFact, readPersistedMediaFacts } from "../media/media-facts.js";
 import { isRelativeAssistantMediaReference, splitMediaOutput } from "../media/parse-output.js";
 import { normalizeInputProvenance } from "../sessions/input-provenance.js";
@@ -181,10 +184,7 @@ export function suppressSilentAssistantMessageText(message: unknown): unknown {
             offset < end &&
             !(isRelativeAssistantMediaReference(url) && managed.has(url.trim())),
         )
-        .map(({ url }) => {
-          const quote = url.includes('"') ? "'" : '"';
-          return `MEDIA:${quote}${url}${quote}`;
-        })
+        .map(({ url }) => serializeReplyMediaDirective(url))
         .join("\n"),
     ]
       .filter(Boolean)

@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
+import { parseReplyDirectives } from "../../auto-reply/reply/reply-directives.js";
 import { projectAssistantTranscriptText } from "./transcript-assistant-delivery-read.js";
 
 describe("projectAssistantTranscriptText", () => {
+  it.each([
+    '"https://example.test/first image.png?signature=abc)"',
+    "'https://example.test/last.png?signature=abc\"'",
+  ])("preserves quoted media through transcript re-parsing: %s", (reference) => {
+    const content = `Private reasoning.\nMEDIA:${reference}\nNO_REPLY`;
+    const projected = projectAssistantTranscriptText({ role: "assistant", content });
+    expect(parseReplyDirectives(projected?.text ?? "").mediaUrls).toEqual(
+      parseReplyDirectives(content).mediaUrls,
+    );
+  });
+
   it.each([
     { parts: ["Mention ", "NO_REPLY"], text: "Mention NO_REPLY" },
     { parts: ["First.", "\n", "Second."], text: "First.\nSecond." },
@@ -18,17 +30,17 @@ describe("projectAssistantTranscriptText", () => {
     {
       name: "image after the silent token",
       content: "NO_REPLY\nMEDIA:https://example.test/chart.png",
-      text: "MEDIA:https://example.test/chart.png",
+      text: 'MEDIA:"https://example.test/chart.png"',
     },
     {
       name: "voice after the silent token",
       content: "NO_REPLY\n[[audio_as_voice]]\nMEDIA:https://example.test/voice.ogg",
-      text: "[[audio_as_voice]]\nMEDIA:https://example.test/voice.ogg",
+      text: '[[audio_as_voice]]\nMEDIA:"https://example.test/voice.ogg"',
     },
     {
       name: "image before a final silent line",
       content: "Private reasoning.\nMEDIA:https://example.test/chart.png\nNO_REPLY",
-      text: "MEDIA:https://example.test/chart.png",
+      text: 'MEDIA:"https://example.test/chart.png"',
     },
     {
       name: "invalid media receipt",

@@ -72,6 +72,11 @@ export function parseReplyDirectivesFromMedia(
   };
 }
 
+export function serializeReplyMediaDirective(url: string): string {
+  const quote = url.includes('"') ? "'" : '"';
+  return `MEDIA:${quote}${url}${quote}`;
+}
+
 /** Retains deliverable text and media when projecting a parsed reply into a transcript. */
 export function serializeReplyDirectiveText(
   parsed: Pick<ReplyDirectiveParseResult, "text" | "mediaUrls" | "audioAsVoice">,
@@ -79,7 +84,7 @@ export function serializeReplyDirectiveText(
   return [
     parsed.text,
     ...(parsed.audioAsVoice && parsed.mediaUrls?.length ? ["[[audio_as_voice]]"] : []),
-    ...(parsed.mediaUrls ?? []).map((url) => `MEDIA:${url}`),
+    ...(parsed.mediaUrls ?? []).map(serializeReplyMediaDirective),
   ]
     .filter(Boolean)
     .join("\n");

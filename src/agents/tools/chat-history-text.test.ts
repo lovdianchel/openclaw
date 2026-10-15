@@ -39,7 +39,7 @@ describe("extractStoredAssistantText", () => {
     {
       name: "media with a silent tail",
       content: "Reasoning.\n[[audio_as_voice]]\nMEDIA:/tmp/voice.ogg\nNO_REPLY",
-      expected: "[[audio_as_voice]]\nMEDIA:/tmp/voice.ogg",
+      expected: '[[audio_as_voice]]\nMEDIA:"/tmp/voice.ogg"',
     },
     {
       name: "voice tag without an attachment",

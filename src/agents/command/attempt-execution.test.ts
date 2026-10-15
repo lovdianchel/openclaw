@@ -460,11 +460,11 @@ describe("createAcpVisibleTextAccumulator", () => {
   it.each([
     {
       suffix: "MEDIA:https://example.test/chart.png",
-      text: "MEDIA:https://example.test/chart.png",
+      text: 'MEDIA:"https://example.test/chart.png"',
     },
     {
       suffix: "[[audio_as_voice]]\nMEDIA:https://example.test/voice.ogg",
-      text: "[[audio_as_voice]]\nMEDIA:https://example.test/voice.ogg",
+      text: '[[audio_as_voice]]\nMEDIA:"https://example.test/voice.ogg"',
     },
     {
       suffix: "MEDIA:media://inbound/",
