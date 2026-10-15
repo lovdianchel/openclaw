@@ -32,7 +32,6 @@ import type {
   BoardProviderLease,
 } from "../../lib/board/provider.ts";
 import type { BoardFace } from "../../lib/board/settings.ts";
-import { PRESENTATION_CHANGED_EVENT } from "../../lib/presentation.ts";
 import type { GitHubPublicationBinding } from "../../lib/sessions/session-capability.ts";
 import {
   areUiSessionKeysEquivalent,
@@ -42,12 +41,13 @@ import {
 } from "../../lib/sessions/session-key.ts";
 import type { SwarmRosterHydrator } from "../../lib/sessions/swarm-roster.ts";
 import { SessionUnreadPatchGuard } from "../../lib/sessions/unread.ts";
-import { PollController } from "../../lit/poll-controller.ts";
 import {
   ControllerHost,
   SubscriptionsController,
   viewState,
-} from "../../lit/subscriptions-controller.ts";
+} from "../../lib/subscriptions-controller.ts";
+import { PollController } from "../../lit/poll-controller.ts";
+import { PRESENTATION_CHANGED_EVENT } from "../../lib/presentation.ts";
 import { ChatComposerCapabilityHost } from "./chat-composer-capability-host.tsx";
 import {
   CHAT_PANE_LIFECYCLE_CHANGED_EVENT,
