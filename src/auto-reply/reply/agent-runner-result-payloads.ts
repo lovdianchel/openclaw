@@ -719,7 +719,6 @@ export async function prepareReplyAgentPayloads(state: {
     activeSessionEntry,
     replyCompletion: completion,
     completedSourceReplyDelivery,
-    terminalReplyDelivery,
     reminderNoteAppended: guardedReplyPayloads !== replyPayloads,
     guardedReplyPayloads,
     responseUsageLine,
