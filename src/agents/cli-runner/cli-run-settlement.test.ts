@@ -1,6 +1,7 @@
 /** Tests native CLI continuity projection and bounded transcript-flush probing. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../test/helpers/promise.js";
+import { prepareCliAssistantReply } from "../../auto-reply/reply/cli-reply-payload.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { wrapRunWithTestPreparedAdmission } from "../admitted-run-context.test-support.js";
 import {
@@ -23,7 +24,6 @@ import {
   buildBlockedCliRunResult,
   buildCliDeliveredFailure,
   buildCliRunResult,
-  prepareCliAssistantReply,
   settleCliPreparationError,
   settlePreparedCliRun,
 } from "./cli-run-settlement.js";

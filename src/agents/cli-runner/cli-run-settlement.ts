@@ -1,9 +1,8 @@
 import { setReplyPayloadMetadata, type ReplyPayload } from "../../auto-reply/reply-payload.js";
-import { prepareCliReplyPayload } from "../../auto-reply/reply/cli-reply-payload.js";
-import { normalizeReplyPayloadOutcome } from "../../auto-reply/reply/normalize-reply.js";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import { formatErrorMessage } from "../../infra/errors.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
+import { buildAgentRunTerminalReplySnapshot } from "../agent-run-terminal-reply.js";
 import {
   externalCliDiscoveryForProviderAuth,
   loadAuthProfileStoreForRuntimeAsync,
@@ -457,32 +456,6 @@ export function buildCliDeliveredFailure(params: {
   };
 }
 
-export function prepareCliAssistantReply(output: Pick<CliOutput, "text" | "textParts">): {
-  text: string;
-  hasContent: boolean;
-  terminalReplyKind?: EmbeddedAgentRunResult["meta"]["terminalReplyKind"];
-} {
-  const outcomes = (output.textParts ?? [output.text]).map((text) =>
-    normalizeReplyPayloadOutcome(prepareCliReplyPayload(text)),
-  );
-  const payloads = outcomes.flatMap((outcome) =>
-    outcome.kind === "deliver" ? [outcome.payload] : [],
-  );
-  const hasContent = payloads.length > 0;
-  return {
-    text: payloads
-      .map((payload) => payload.text?.trim())
-      .filter(Boolean)
-      .join("\n"),
-    hasContent,
-    terminalReplyKind:
-      !hasContent &&
-      outcomes.some((outcome) => outcome.kind === "suppress" && outcome.reason === "silent")
-        ? "silent-empty"
-        : undefined,
-  };
-}
-
 export function buildCliRunResult(params: {
   context: PreparedCliRunContext;
   output: CliOutput;
@@ -592,6 +565,13 @@ export function buildCliRunResult(params: {
         : (effectiveCliSessionId ?? runParams.sessionId ?? "");
   const yielded = output.yielded === true;
   const stopReason = terminalInterruption?.reason ?? (yielded ? "end_turn" : "completed");
+  const settledReplyKind =
+    !terminalInterruption &&
+    !yielded &&
+    !sourceReplyMirror.delivered &&
+    !output.toolMediaUrls?.length
+      ? terminalReplyKind
+      : undefined;
 
   try {
     if (!terminalInterruption && runParams.onSuccessfulAuthBinding) {
@@ -635,13 +615,14 @@ export function buildCliRunResult(params: {
       ...(output.finalPromptText ? { finalPromptText: output.finalPromptText } : {}),
       finalAssistantVisibleText: assistantText,
       ...(rawText ? { finalAssistantRawText: rawText } : {}),
-      ...(terminalReplyKind &&
-      !terminalInterruption &&
-      !yielded &&
-      !sourceReplyMirror.delivered &&
-      !output.toolMediaUrls?.length
-        ? { terminalReplyKind }
-        : {}),
+      ...(settledReplyKind ? { terminalReplyKind: settledReplyKind } : {}),
+      // Completed messages were normalized separately; cumulative raw text cannot retract them.
+      terminalReply: sourceReplyMirror.delivered
+        ? undefined
+        : buildAgentRunTerminalReplySnapshot({
+            visibleText: assistantText,
+            terminalReplyKind: settledReplyKind,
+          }),
       // An empty final message is recorded as "" so capture never falls back to
       // the cumulative raw text.
       ...(rawFinalText !== undefined && rawFinalText !== rawText

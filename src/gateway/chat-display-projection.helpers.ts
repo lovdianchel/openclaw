@@ -150,7 +150,7 @@ export function extractAssistantReplyDirectives(
     texts.push(typed.text);
   }
   return texts.length > 0
-    ? parseReplyDirectivesFromMedia(splitMediaOutput(texts.join("\n"), { onMediaDirective }))
+    ? parseReplyDirectivesFromMedia(splitMediaOutput(texts.join(""), { onMediaDirective }))
     : undefined;
 }
 
@@ -173,7 +173,7 @@ export function suppressSilentAssistantMessageText(message: unknown): unknown {
   );
   const mediaText = (start = 0, end = Infinity) =>
     [
-      start === 0 ? parsed.text : "",
+      start === 0 && end > 0 ? parsed.text : "",
       media
         .filter(
           ({ url, offset }) =>
@@ -206,7 +206,7 @@ export function suppressSilentAssistantMessageText(message: unknown): unknown {
       }
       const text =
         typeof entry.text === "string" ? "" : mediaText(offset, offset + part.text.length);
-      offset += part.text.length + 1;
+      offset += part.text.length;
       return [
         {
           ...part,

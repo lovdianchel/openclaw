@@ -3,6 +3,7 @@ import {
   setReplyPayloadMetadata,
   type ReplyPayload,
 } from "../reply-payload.js";
+import { normalizeReplyPayloadOutcome } from "./normalize-reply.js";
 import { parseReplyDirectives } from "./reply-directives.js";
 
 export function prepareCliReplyPayload(
@@ -27,4 +28,30 @@ export function prepareCliReplyPayload(
     setReplyPayloadMetadata(reply, { silentReply: true });
   }
   return reply;
+}
+
+export function prepareCliAssistantReply(output: { text: string; textParts?: string[] }): {
+  text: string;
+  hasContent: boolean;
+  terminalReplyKind?: "silent-empty";
+} {
+  const outcomes = (output.textParts ?? [output.text]).map((text) =>
+    normalizeReplyPayloadOutcome(prepareCliReplyPayload(text)),
+  );
+  const payloads = outcomes.flatMap((outcome) =>
+    outcome.kind === "deliver" ? [outcome.payload] : [],
+  );
+  const hasContent = payloads.length > 0;
+  return {
+    text: payloads
+      .map((payload) => payload.text?.trim())
+      .filter(Boolean)
+      .join("\n"),
+    hasContent,
+    terminalReplyKind:
+      !hasContent &&
+      outcomes.some((outcome) => outcome.kind === "suppress" && outcome.reason === "silent")
+        ? "silent-empty"
+        : undefined,
+  };
 }

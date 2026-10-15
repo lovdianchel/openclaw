@@ -56,6 +56,13 @@ describe("control reply display projection", () => {
     },
   );
 
+  it("keeps an inline silent-token mention split across adjacent text blocks", () => {
+    const message = assistant([textBlock("Mention "), textBlock("NO_REPLY")]);
+    expect(projectChatDisplayMessages([message])).toEqual([
+      assistant([textBlock("Mention "), textBlock("")]),
+    ]);
+  });
+
   it.each([63, 64])("classifies replies at the %i-character padding boundary", (length) => {
     for (const padding of [" ".repeat(length), "。".repeat(length)]) {
       const control = `${padding}NO_REPLY`;
@@ -131,7 +138,7 @@ describe("control reply display projection", () => {
     },
     {
       name: "visible sibling text",
-      message: assistant([textBlock("Visible reply"), textBlock("NO_REPLY")]),
+      message: assistant([textBlock("Visible reply\n"), textBlock("NO_REPLY")]),
       expected: [],
     },
     { name: "forwarded reply", message: forwarded, expected: [forwarded] },
@@ -158,7 +165,7 @@ describe("control reply display projection", () => {
           : {}),
       };
       const terminal = {
-        ...textBlock("NO_REPLY"),
+        ...textBlock("\nNO_REPLY"),
         ...(phased
           ? { textSignature: JSON.stringify({ v: 1, id: "final", phase: "final_answer" }) }
           : {}),
@@ -193,14 +200,18 @@ describe("control reply display projection", () => {
     );
   });
 
-  it.each(["string", "blocks", "text"] as const)(
+  it.each(["string", "blocks", "blocks-leading-empty", "text"] as const)(
     "keeps media-failure notices from a silent %s message through UI normalization",
     (shape) => {
       const text = "No explanation needed.\nNO_REPLY\nMEDIA:media://inbound/";
       const message =
         shape === "text"
           ? { role: "assistant", text }
-          : assistant(shape === "string" ? text : [textBlock(text)]);
+          : assistant(
+              shape === "string"
+                ? text
+                : [...(shape === "blocks-leading-empty" ? [textBlock("")] : []), textBlock(text)],
+            );
       const original = structuredClone(message);
       const projected = projectChatDisplayMessages([message]);
       expect(projected).toHaveLength(1);
@@ -226,7 +237,10 @@ describe("control reply display projection", () => {
 
   it("keeps completed progress separate from a later silent message", () => {
     const progress = assistant([textBlock("Completed the tool step.")]);
-    const silent = assistant([textBlock("The group needs no more detail."), textBlock("NO_REPLY")]);
+    const silent = assistant([
+      textBlock("The group needs no more detail.\n"),
+      textBlock("NO_REPLY"),
+    ]);
     expect(projectChatDisplayMessages([progress, silent])).toEqual([progress]);
   });
 
@@ -277,11 +291,11 @@ describe("control reply display projection", () => {
     const first = "https://example.com/first image.png?signature=abc)";
     const last = 'https://example.com/last.png?signature=abc"';
     const message = assistant([
-      textBlock("```text"),
-      textBlock(`MEDIA:${first}\n\x60\x60\x60`),
+      textBlock("```text\n"),
+      textBlock(`MEDIA:${first}\n\x60\x60\x60\n`),
       textBlock(""),
       {
-        ...textBlock(`The attachment is enough.\nMEDIA:"${first}"`),
+        ...textBlock(`The attachment is enough.\nMEDIA:"${first}"\n`),
         textSignature: JSON.stringify({ v: 1, id: "progress", phase: "commentary" }),
       },
       {

@@ -12,9 +12,12 @@ import {
   prepareSystemAgentRunAdmission,
   type AdmittedRunContext,
 } from "./admitted-run-context.js";
-import { buildAgentRunTerminalReplySnapshot } from "./agent-run-terminal-reply.js";
 import type { PreparedCliRunContext } from "./cli-runner/types.js";
 import { waitForDeferredTurnMaintenanceForSession } from "./embedded-agent-runner/context-engine-maintenance.js";
+import {
+  buildRunEntryTerminal,
+  resolveRunEntryTerminalOutcome,
+} from "./embedded-agent-runner/run-entry-terminal.js";
 
 const { executeMock, historyMock, hookHistoryMock, hookRunnerMock, beforeReplyMock, prepareMock } =
   vi.hoisted(() => ({
@@ -329,6 +332,18 @@ describe("runPreparedCliAgent context engine lifecycle", () => {
       mediaUrls: [],
     },
     {
+      name: "a final source reply after progress",
+      parts: ["No more text is needed.\nNO_REPLY"],
+      sourceReplies: [
+        { text: "Progress update.", sourceReplyFinal: false },
+        { text: "Accepted source answer.", sourceReplyFinal: true },
+      ],
+      visible: "Progress update.\n\nAccepted source answer.",
+      terminalText: "Accepted source answer.",
+      disposition: "visible",
+      mediaUrls: [],
+    },
+    {
       name: "genuinely empty output",
       parts: [""],
       visible: "",
@@ -344,11 +359,16 @@ describe("runPreparedCliAgent context engine lifecycle", () => {
     },
   ])(
     "projects intentional CLI silence into terminal reply metadata: $name",
-    async ({ parts, visible, disposition, mediaUrls }) => {
+    async ({ parts, visible, terminalText, disposition, mediaUrls, sourceReplies }) => {
       const context = buildPreparedContext(createContextEngine());
       context.params.terminalReplyExpectation = "optional";
       const rawText = parts.join("\n");
-      executeMock.mockResolvedValueOnce({ text: rawText, rawText, textParts: parts });
+      executeMock.mockResolvedValueOnce({
+        text: rawText,
+        rawText,
+        textParts: parts,
+        ...(sourceReplies ? { messagingToolSourceReplyPayloads: sourceReplies } : {}),
+      });
 
       const result = await runPreparedCliAgent(context);
 
@@ -358,12 +378,15 @@ describe("runPreparedCliAgent context engine lifecycle", () => {
         disposition === "silent" ? "silent-empty" : undefined,
       );
       expect(
-        buildAgentRunTerminalReplySnapshot({
-          visibleText: result.meta.finalAssistantVisibleText,
-          rawText: result.meta.finalAssistantRawText,
-          terminalReplyKind: result.meta.terminalReplyKind,
-        }),
-      ).toEqual(visible ? { disposition, text: visible } : { disposition });
+        buildRunEntryTerminal({
+          result,
+          outcome: resolveRunEntryTerminalOutcome({ result, fallbackExhausted: false }),
+          behavior: { kind: "followup-delivery" },
+          runId: "run-1",
+          requested: { provider: context.params.provider, model: context.modelId },
+          sessionId: context.params.sessionId,
+        }).metadata.terminalReply,
+      ).toEqual(visible ? { disposition, text: terminalText ?? visible } : { disposition });
       expect(
         result.payloads?.flatMap(
           (payload) => prepareCliReplyPayload(payload.text ?? "").mediaUrls ?? [],

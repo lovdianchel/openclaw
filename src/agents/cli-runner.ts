@@ -1,3 +1,4 @@
+import { prepareCliAssistantReply } from "../auto-reply/reply/cli-reply-payload.js";
 import { runWithCliHistoryWriter } from "../config/sessions/cli-history-boundary.js";
 import { prepareCronRootSessionGeneration } from "../config/sessions/session-delivery-generation.js";
 import { buildGenericCliContextEngineHostSupport } from "../context-engine/host-compat.js";
@@ -35,7 +36,6 @@ import {
   buildCliRunResult,
   formatCliTerminalInterruption,
   isClaudeCliBackend,
-  prepareCliAssistantReply,
   resolveCliSourceReplyMirror,
   settleCliPreparationError,
   settlePreparedCliRun,

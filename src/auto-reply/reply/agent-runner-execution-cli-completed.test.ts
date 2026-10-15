@@ -7,10 +7,7 @@ import {
   claudeTextDelta,
   joinJsonlFrames,
 } from "../../agents/cli-output.test-helpers.js";
-import {
-  buildCliRunResult,
-  prepareCliAssistantReply,
-} from "../../agents/cli-runner/cli-run-settlement.js";
+import { buildCliRunResult } from "../../agents/cli-runner/cli-run-settlement.js";
 import { createCliEventHandlers } from "../../agents/cli-runner/execute-events.js";
 import {
   buildContext,
@@ -25,6 +22,7 @@ import {
   runInitialFallbackAttempt,
 } from "./agent-runner-execution.test-support.js";
 import type { FallbackRunnerParams } from "./agent-runner-execution.test-support.js";
+import { prepareCliAssistantReply } from "./cli-reply-payload.js";
 
 const state = await setupAgentRunnerExecutionTestState();
 
