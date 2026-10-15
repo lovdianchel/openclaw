@@ -11,8 +11,13 @@ import {
 } from "../../config/runtime-snapshot.js";
 import { upsertSessionEntryCore } from "../../config/sessions/session-accessor.js";
 import { useSessionStoreTempDirs } from "../../test-utils/session-state-cleanup.js";
+import {
+  buildAgentRunTerminalReplySnapshot,
+  normalizeAgentRunTerminalReplySnapshot,
+} from "../agent-run-terminal-reply.js";
 import { SessionManager } from "../sessions/session-manager.js";
 import { buildAssistantMessage, buildUsageWithNoCost } from "../stream-message-shared.js";
+import { buildAcpResult } from "./acp-lifecycle.js";
 
 const mocks = vi.hoisted(() => ({
   readClaudeCliFallbackSeed: vi.fn(),
@@ -424,6 +429,38 @@ describe("claudeCliSessionTranscriptHasOrphanedToolUse", () => {
 });
 
 describe("createAcpVisibleTextAccumulator", () => {
+  it("keeps live and raw ACP text while marking a final standalone silent token as silent", () => {
+    const acc = createAcpVisibleTextAccumulator();
+    const reasoning = "The conversation needs no further answer.";
+    const rawText = `${reasoning}\nNO_REPLY`;
+    expect(acc.consume(reasoning)).toEqual({ text: reasoning, delta: reasoning });
+    expect(acc.consume("\nNO_REPLY")).toEqual({ text: rawText, delta: "\nNO_REPLY" });
+    expect(acc.finalizeRaw()).toBe(rawText);
+    const result = buildAcpResult({
+      payloadText: acc.finalize(),
+      terminalReply: acc.finalizeReplySnapshot(),
+      startedAt: 0,
+    });
+    expect(result.payloads).toEqual([]);
+    expect(result.meta.terminalReply).toEqual({ disposition: "silent" });
+  });
+
+  it.each([
+    { visibleText: "Internal reasoning.", rawText: "Internal reasoning.\nNO_REPLY" },
+    { visibleText: "Internal reasoning.\nNO_REPLY" },
+  ])("classifies raw and visible completed terminal evidence: %j", (params) => {
+    expect(buildAgentRunTerminalReplySnapshot(params)).toEqual({ disposition: "silent" });
+  });
+
+  it("normalizes persisted terminal silence before truncating its text", () => {
+    expect(
+      normalizeAgentRunTerminalReplySnapshot({
+        disposition: "visible",
+        text: `${"r".repeat(5_000)}\nNO_REPLY`,
+      }),
+    ).toEqual({ disposition: "silent" });
+  });
+
   it("preserves cumulative raw snapshots after stripping a glued NO_REPLY prefix", () => {
     const acc = createAcpVisibleTextAccumulator();
 
@@ -474,7 +511,22 @@ describe("createAcpVisibleTextAccumulator", () => {
 
   it.each([
     { name: "exact silence", chunks: ["NO_REPLY"], expected: { disposition: "silent" } },
-    { name: "partial control prefix", chunks: ["NO_RE"], expected: { disposition: "empty" } },
+    { name: "partial control prefix", chunks: ["NO_RE"], expected: { disposition: "silent" } },
+    {
+      name: "inline trailing token",
+      chunks: ["Done. NO_REPLY"],
+      expected: { disposition: "visible", text: "Done. NO_REPLY" },
+    },
+    {
+      name: "leading-token answer",
+      chunks: ["NO_REPLY\nSubstantive answer."],
+      expected: { disposition: "visible", text: "Substantive answer." },
+    },
+    {
+      name: "mid-text token mention",
+      chunks: ["The NO_REPLY token is documented here."],
+      expected: { disposition: "visible", text: "The NO_REPLY token is documented here." },
+    },
   ])("classifies $name at ACP finalization", ({ chunks, expected }) => {
     const acc = createAcpVisibleTextAccumulator();
     for (const chunk of chunks) {

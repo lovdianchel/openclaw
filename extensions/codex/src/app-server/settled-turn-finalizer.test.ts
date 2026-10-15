@@ -330,22 +330,25 @@ describe("runCodexSettledTurnFinalization", () => {
     expect(mocks.mirror).not.toHaveBeenCalled();
   });
 
-  it.each([" NO_REPLY\n", " "])("preserves silent managed Stop-hook output %j", async (text) => {
-    mocks.runBounded.mockResolvedValue({
-      ...boundedResult(),
-      text,
-      managedHooksEnabled: true,
-      items: managedHookItems(text),
-    });
-    const result = await finalize();
-    expect(result.assistant).toMatchObject({
-      provider: "openai",
-      model: "synthetic-summary-model",
-      content: [{ type: "text", text: text.trim() }],
-    });
-    expect(mocks.runBounded).toHaveBeenCalledOnce();
-    expect(mocks.mirror).not.toHaveBeenCalled();
-  });
+  it.each([" NO_REPLY\n", "draft\nNO_REPLY", " "])(
+    "preserves silent managed Stop-hook output %j",
+    async (text) => {
+      mocks.runBounded.mockResolvedValue({
+        ...boundedResult(),
+        text,
+        managedHooksEnabled: true,
+        items: managedHookItems(text),
+      });
+      const result = await finalize();
+      expect(result.assistant).toMatchObject({
+        provider: "openai",
+        model: "synthetic-summary-model",
+        content: [{ type: "text", text: text.trim() }],
+      });
+      expect(mocks.runBounded).toHaveBeenCalledOnce();
+      expect(mocks.mirror).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     {

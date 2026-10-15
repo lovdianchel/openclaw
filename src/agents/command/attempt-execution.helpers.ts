@@ -500,7 +500,7 @@ export function createAcpVisibleTextAccumulator() {
     finalizeReplySnapshot(): AgentRunTerminalReplySnapshot {
       return buildAgentRunTerminalReplySnapshot({
         visibleText,
-        rawText: visibleText ? "" : rawText,
+        rawText,
       });
     },
   };

@@ -4,6 +4,53 @@ import { extractStoredAssistantText } from "./chat-history-text.js";
 
 describe("extractStoredAssistantText", () => {
   it.each([
+    { name: "plain text", content: "Internal reasoning.\nNO_REPLY", expected: "NO_REPLY" },
+    {
+      name: "split output text",
+      content: [
+        { type: "output_text", text: "Internal reasoning." },
+        { type: "output_text", text: "\n **NO_REPLY** \n\n" },
+      ],
+      expected: "NO_REPLY",
+    },
+    {
+      name: "adjacent inline text",
+      content: [
+        { type: "text", text: "Mention " },
+        { type: "text", text: "NO_REPLY" },
+      ],
+      expected: "Mention NO_REPLY",
+    },
+    {
+      name: "leading token",
+      content: "NO_REPLY\nVisible answer.",
+      expected: "NO_REPLY\nVisible answer.",
+    },
+    {
+      name: "token mention",
+      content: "NO_REPLY is a control token.",
+      expected: "NO_REPLY is a control token.",
+    },
+    {
+      name: "media without a silent tail",
+      content: "Answer.\nMEDIA:/tmp/chart.png",
+      expected: "Answer.\nMEDIA:/tmp/chart.png",
+    },
+    {
+      name: "media with a silent tail",
+      content: "Reasoning.\n[[audio_as_voice]]\nMEDIA:/tmp/voice.ogg\nNO_REPLY",
+      expected: "[[audio_as_voice]]\nMEDIA:/tmp/voice.ogg",
+    },
+    {
+      name: "voice tag without an attachment",
+      content: "[[audio_as_voice]]\nNO_REPLY",
+      expected: "NO_REPLY",
+    },
+  ])("preserves authored final-line intent: $name", ({ content, expected }) => {
+    expect(extractStoredAssistantText({ role: "assistant", content })).toBe(expected);
+  });
+
+  it.each([
     [
       "tool calls",
       'Hello <invoke name="tool">payload</invoke></minimax:tool_call> [Tool Call: foo (ID: 1)] world',

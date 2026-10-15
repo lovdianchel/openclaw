@@ -267,6 +267,43 @@ describe("readSubagentOutput", () => {
     await expect(readSubagentOutput("agent:main:subagent:child")).resolves.toBeUndefined();
   });
 
+  it.each([
+    {
+      name: "plain text",
+      content: [{ type: "text", text: "Internal reasoning.\nNO_REPLY" }],
+    },
+    {
+      name: "a trailing commentary block",
+      content: [
+        {
+          type: "text",
+          text: "A draft answer that is withdrawn.",
+          textSignature: '{"v":1,"phase":"final_answer"}',
+        },
+        { type: "text", text: "\nNO_REPLY", textSignature: '{"v":1,"phase":"commentary"}' },
+      ],
+    },
+  ])("captures final-line silence from $name in private transcripts", async ({ content }) => {
+    const deps = installOutputDeps({
+      messages: [textAssistant("stale visible output")],
+      transcriptMessages: [
+        textAssistant("An earlier answer must not be resurrected."),
+        { role: "assistant", stopReason: "stop", content },
+      ],
+    });
+    await expect(
+      readSubagentOutput("agent:main:subagent:child", undefined, {
+        sessionTarget: {
+          agentId: "main",
+          sessionId: "child-session",
+          sessionKey: "agent:main:subagent:child",
+          storePath: "/tmp/openclaw/agents/main/sessions/sessions.json",
+        },
+      }),
+    ).resolves.toBe("NO_REPLY");
+    expect(deps.callGateway).not.toHaveBeenCalled();
+  });
+
   it("reads recovered output from the private SQLite transcript before gateway history", async () => {
     const deps = installOutputDeps({
       messages: [textAssistant("stale visible output")],

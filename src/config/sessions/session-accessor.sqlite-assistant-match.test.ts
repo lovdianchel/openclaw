@@ -160,6 +160,31 @@ describe("persisted assistant transcript matching", () => {
     }
   });
 
+  it.each(["NO_REPLY", "Private narration.\nNO_REPLY"])(
+    "selects the accepted source reply before a silent terminal message: %s",
+    (terminalText) => {
+      const runId = "source-reply-run";
+      const sourceReply = {
+        id: "source-reply",
+        message: {
+          role: "assistant",
+          content: "Accepted answer.",
+          __openclaw: { runId },
+          openclawDeliveryMirror: { kind: "message-tool-source-reply", final: true },
+        },
+      };
+      insert(0, JSON.stringify(sourceReply));
+      insert(
+        1,
+        JSON.stringify({
+          id: "silent-terminal",
+          message: { role: "assistant", content: terminalText, __openclaw: { runId } },
+        }),
+      );
+      expect(find({ kind: "visible-final", runId })).toEqual({ event: sourceReply });
+    },
+  );
+
   it("skips malformed and non-object rows while retaining SQLite-overdepth JSON", () => {
     insert(
       0,

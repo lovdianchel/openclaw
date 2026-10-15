@@ -1,7 +1,7 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { truncateWithMarker } from "@openclaw/normalization-core/utf16-slice";
 import { stripInternalMetadataForDisplay } from "../auto-reply/reply/display-text-sanitize.js";
-import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
+import { isSilentReplyPayloadText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { normalizeAgentRunRouteChange } from "./agent-run-terminal-receipt.js";
 import type { AgentRunTerminalReplySnapshot } from "./agent-run-terminal-reply.types.js";
 
@@ -34,7 +34,7 @@ export function buildAgentRunTerminalReplySnapshot(params: {
 }): AgentRunTerminalReplySnapshot {
   if (
     params.terminalReplyKind === "silent-empty" ||
-    isSilentReplyText(params.rawText ?? params.visibleText, SILENT_REPLY_TOKEN)
+    isSilentReplyPayloadText(params.rawText ?? params.visibleText, SILENT_REPLY_TOKEN)
   ) {
     return { disposition: "silent" };
   }
@@ -66,11 +66,12 @@ export function normalizeAgentRunTerminalReplySnapshot(
   if (typeof rawText !== "string") {
     return undefined;
   }
-  const text = sanitizeAgentRunTerminalReplyText(rawText);
+  const reply = buildAgentRunTerminalReplySnapshot({ visibleText: rawText });
+  if (reply.disposition !== "visible") {
+    return reply;
+  }
   const modelRouteChange = normalizeAgentRunRouteChange(value.modelRouteChange);
-  return text
-    ? { disposition: "visible", text, ...(modelRouteChange ? { modelRouteChange } : {}) }
-    : { disposition: "empty" };
+  return modelRouteChange ? { ...reply, modelRouteChange } : reply;
 }
 
 /** Reply evidence merges independently from sticky timeout/cancellation precedence. */
