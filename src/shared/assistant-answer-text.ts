@@ -34,14 +34,13 @@ export function resolveRawAssistantAnswerText(message: unknown): string {
   const signedUnphasedParts = readAssistantTextBlocksForPhase({
     content: lastAssistant.content,
   }).filter((block) => parseAssistantTextSignature(block)?.id);
-  if (signedUnphasedParts.length) {
-    return (
-      normalizeOptionalString(
-        sanitizeAssistantFinalAnswerText(
-          extractAssistantAuthoredText({ content: signedUnphasedParts }),
-        ),
-      ) ?? ""
-    );
+  const signedText = normalizeOptionalString(
+    sanitizeAssistantFinalAnswerText(
+      extractAssistantAuthoredText({ content: signedUnphasedParts }),
+    ),
+  );
+  if (signedText) {
+    return signedText;
   }
   return (
     normalizeOptionalString(sanitizeAssistantVisibleText(readAuthoredPhaseText(lastAssistant))) ??

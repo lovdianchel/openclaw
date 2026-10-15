@@ -27,4 +27,19 @@ describe("resolveRawAssistantAnswerText", () => {
       }
     },
   );
+
+  it.each(["", " \n", "<think>Internal.</think>"])(
+    "falls back past signed blocks that sanitize to empty: %j",
+    (text) => {
+      expect(
+        resolveRawAssistantAnswerText({
+          role: "assistant",
+          content: [
+            { type: "text", text, textSignature: "signed-block" },
+            { type: "text", text: "Answer." },
+          ],
+        }),
+      ).toBe("Answer.");
+    },
+  );
 });
