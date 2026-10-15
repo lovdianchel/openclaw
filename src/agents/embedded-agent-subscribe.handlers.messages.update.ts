@@ -1,6 +1,4 @@
-import { asOptionalObjectRecord } from "@openclaw/normalization-core/record-coerce";
 import { emitAgentEvent } from "../infra/agent-events.js";
-import type { AssistantMessage } from "../llm/types.js";
 import { resolveAssistantMessagePhase } from "../shared/chat-message-content.js";
 import { toolCallXmlTextFilter } from "../shared/text/assistant-visible-text.js";
 import { downgradedToolCallTextFilter } from "../shared/text/downgraded-tool-call-text.js";
@@ -8,10 +6,7 @@ import { createTextProjection, trimTextFilter } from "../shared/text/text-projec
 import { resolveCurrentSourceMessagingToolPartial } from "./embedded-agent-helpers/messaging-dedupe.js";
 import { updateLiveEditDiffProgress } from "./embedded-agent-live-edit-diff.js";
 import { runBestEffortCallback } from "./embedded-agent-subscribe.callback.js";
-import {
-  mergeReplyDirectiveResults,
-  recordPendingAssistantReplyDirectives,
-} from "./embedded-agent-subscribe.handlers.messages.replies.js";
+import { recordPendingAssistantReplyDirectives } from "./embedded-agent-subscribe.handlers.messages.replies.js";
 import {
   extractAssistantStreamSnapshot,
   reconcileBlockReplySnapshot,
@@ -26,7 +21,6 @@ import {
   isSubscribeTranscriptOnlyOpenClawAssistantMessage,
   openReasoningStream,
   resolveAssistantStreamBlockIndex,
-  resolveAssistantStreamContentIndex,
   resolveAssistantStreamItemId,
   resolveAssistantTextChunk,
   resolveStreamingReply,
@@ -47,13 +41,13 @@ import {
   extractAssistantVisibleText,
   extractThinkingFromTaggedStream,
 } from "./embedded-agent-utils.js";
-import type { AgentEvent, AgentMessage } from "./runtime/index.js";
+import type { AgentEvent } from "./runtime/index.js";
 
 const REASONING_TAG_RE = /<\s*\/?\s*(?:(?:antml:|mm:)?(?:think(?:ing)?|thought)|antthinking)\b/i;
 
 export function handleMessageUpdate(
   ctx: EmbeddedAgentSubscribeContext,
-  evt: AgentEvent & { message: AgentMessage; assistantMessageEvent?: unknown },
+  evt: Extract<AgentEvent, { type: "message_update" }>,
 ): Promise<void> | undefined {
   const msg = evt.message;
   if (msg?.role !== "assistant" || isSubscribeTranscriptOnlyOpenClawAssistantMessage(msg)) {
@@ -61,8 +55,8 @@ export function handleMessageUpdate(
   }
 
   ctx.noteLastAssistant(msg);
-  const assistantRecord = asOptionalObjectRecord(evt.assistantMessageEvent);
-  const evtType = typeof assistantRecord?.type === "string" ? assistantRecord.type : "";
+  const assistantRecord = evt.assistantMessageEvent;
+  const evtType = assistantRecord.type;
   if (evtType !== "text_delta") {
     ctx.flushAssistantStream();
   }
@@ -77,9 +71,7 @@ export function handleMessageUpdate(
     });
   }
   const eventAssistantMessage =
-    assistantRecord?.partial && typeof assistantRecord.partial === "object"
-      ? (assistantRecord.partial as AssistantMessage)
-      : msg;
+    ("partial" in assistantRecord ? assistantRecord.partial : undefined) ?? msg;
   const isResponsesTextEvent =
     isResponsesApiAssistantMessage(eventAssistantMessage) &&
     (evtType === "text_start" || evtType === "text_delta" || evtType === "text_end");
@@ -121,16 +113,14 @@ export function handleMessageUpdate(
     ) {
       openReasoningStream(ctx);
     }
-    const thinkingDelta = typeof assistantRecord?.delta === "string" ? assistantRecord.delta : "";
-    const thinkingContent =
-      typeof assistantRecord?.content === "string" ? assistantRecord.content : "";
+    const thinkingDelta = assistantRecord.type === "thinking_delta" ? assistantRecord.delta : "";
+    const thinkingContent = assistantRecord.type === "thinking_end" ? assistantRecord.content : "";
     recordRawStream("assistant_thinking_stream", evtType, thinkingDelta, thinkingContent);
     // Emit-always: emitReasoningStream always reaches the bus/archive; the
     // streamReasoning rendering hook and message_tool_only source suppression
     // are gated downstream (dispatch wrapProgressCallback, #92738), so emission
     // here stays unconditional.
-    const block =
-      Array.isArray(msg.content) && msg.content.length === 1 ? msg.content[0] : undefined;
+    const block = msg.content.length === 1 ? msg.content[0] : undefined;
     const nativeThinking = block?.type === "thinking" ? block : undefined;
     ctx.emitReasoningStream(
       nativeThinking ?? (extractAssistantThinking(msg) || thinkingContent || thinkingDelta),
@@ -157,8 +147,8 @@ export function handleMessageUpdate(
     return undefined;
   }
 
-  const delta = typeof assistantRecord?.delta === "string" ? assistantRecord.delta : "";
-  const content = typeof assistantRecord?.content === "string" ? assistantRecord.content : "";
+  const delta = assistantRecord.type === "text_delta" ? assistantRecord.delta : "";
+  const content = assistantRecord.type === "text_end" ? assistantRecord.content : "";
 
   recordRawStream("assistant_text_stream", evtType, delta, content);
 
@@ -166,7 +156,7 @@ export function handleMessageUpdate(
   const priorBlockText = ctx.state.streamBlockText;
   const priorBlockFinal = ctx.state.streamBlockFinal;
   const priorBlockIndex = ctx.state.lastAssistantStreamContentIndex;
-  const streamContentIndex = resolveAssistantStreamContentIndex(assistantRecord?.contentIndex);
+  const streamContentIndex = assistantRecord.contentIndex;
   const streamItemId = resolveAssistantStreamItemId({
     contentIndex: streamContentIndex,
     message: partialAssistant,
@@ -315,9 +305,7 @@ export function handleMessageUpdate(
   // A text_start partial may already contain text that the following text_delta replays.
   // Use starts only for lifecycle boundaries; consume their text from delta/end events.
   const shouldReadPartialText =
-    streamItemChanged ||
-    (evtType === "text_end" && assistantRecord?.partial !== undefined) ||
-    (shouldUsePhaseAwareBlockReply && (evtType === "text_end" || !chunk));
+    streamItemChanged || evtType === "text_end" || (shouldUsePhaseAwareBlockReply && !chunk);
   const isTerminalSnapshot = evtType === "text_end" && shouldReadPartialText;
   let selectedAssistant =
     shouldUsePhaseAwareBlockReply || isResponsesTextEvent ? streamAssistant : partialAssistant;
@@ -325,7 +313,6 @@ export function handleMessageUpdate(
     isTerminalSnapshot &&
     selectedAssistant === partialAssistant &&
     streamContentIndex !== undefined &&
-    Array.isArray(partialAssistant.content) &&
     streamContentIndex + 1 < partialAssistant.content.length
   ) {
     // Queued provider events can share a mutable partial already containing
@@ -401,7 +388,7 @@ export function handleMessageUpdate(
         textIsAppend = true;
       }
     }
-  } else if (!isTerminalSnapshot && next !== undefined && (chunk || evtType === "text_end")) {
+  } else if (!isTerminalSnapshot && next !== undefined && chunk) {
     visibleDelta = ctx.stripBlockTags(chunk, ctx.state.partialBlockState, {
       final: finalText,
     });
@@ -457,12 +444,9 @@ export function handleMessageUpdate(
     }
     const parsedStreamDirectives = isTerminalSnapshot
       ? ctx.consumePartialReplyDirectives(next, { final: finalText })
-      : mergeReplyDirectiveResults(
-          visibleDelta ? ctx.consumePartialReplyDirectives(visibleDelta) : null,
-          evtType === "text_end"
-            ? ctx.consumePartialReplyDirectives("", { final: finalText })
-            : null,
-        );
+      : visibleDelta
+        ? ctx.consumePartialReplyDirectives(visibleDelta)
+        : null;
     const previousCleaned = ctx.state.assistantStream?.text ?? "";
     const {
       text: cleanedText,

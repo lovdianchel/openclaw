@@ -236,12 +236,11 @@ export function createSubagentRegistryCompletionRuntime(config: {
     source: string,
     expectedEntry: SubagentRunRecord,
   ) {
-    const expectedGeneration = expectedEntry.generation;
     const ownedParams = { ...params, expectedEntry };
     const timer = setTimeout(() => {
       retryTimers.delete(timer);
       const current = getCurrentSubagentRunOwner(runs, expectedEntry);
-      if (!current || current.generation !== expectedGeneration) {
+      if (!current) {
         return;
       }
       completeSubagentRunInBackground(
@@ -262,7 +261,6 @@ export function createSubagentRegistryCompletionRuntime(config: {
     if (!entry) {
       return;
     }
-    const generation = entry.generation;
     const stateContext = captureOpenClawStateWorkerContext();
     const isHostCurrent = () => {
       try {
@@ -272,7 +270,6 @@ export function createSubagentRegistryCompletionRuntime(config: {
       }
       return (
         Boolean(getCurrentSubagentRunOwner(runs, entry)) &&
-        entry.generation === generation &&
         params.recoveryCurrent?.isHostCurrent() !== false
       );
     };
@@ -355,13 +352,11 @@ export function createSubagentRegistryCompletionRuntime(config: {
 
     const endedAt = asFiniteNumber(params.endedAt) ?? Date.now();
     const entry = currentEntry({ ...params, runId });
-    const generation = entry?.generation;
     if (
       !entry ||
       (params.recoveryCurrent && !(await params.recoveryCurrent.prepare())) ||
       params.recoveryCurrent?.isHostCurrent() === false ||
-      !getCurrentSubagentRunOwner(runs, entry) ||
-      entry.generation !== generation
+      !getCurrentSubagentRunOwner(runs, entry)
     ) {
       return 0;
     }
@@ -472,7 +467,6 @@ export function createSubagentResumeReader(params: {
     };
     try {
       const lifecycleGeneration = getAgentEventLifecycleGeneration();
-      const runGeneration = entry.generation;
       const resolveGatewayContext = params.getGatewayContextResolver();
       const gatewayContext = resolveGatewayContext?.();
       const resolveRunGatewayContext = getGatewayContextResolver(entry);
@@ -489,7 +483,6 @@ export function createSubagentResumeReader(params: {
               (gatewayContext !== undefined && resolveGatewayContext() === gatewayContext)) &&
             isSameSubagentRunOwner(current, entry) &&
             current?.runId === runId &&
-            current.generation === runGeneration &&
             getSubagentRunRuntimeKey(current) === resumeKey &&
             getGatewayContextResolver(current) === resolveRunGatewayContext &&
             (!resolveRunGatewayContext ||

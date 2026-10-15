@@ -344,11 +344,16 @@ export async function resolveApiKeyForProviderCore(input: {
         store,
         profileId: undefined,
         lockedProfile: true,
-      }) //
-        .catch(() => {
-          params.signal?.throwIfAborted();
-          return result;
-        });
+      }).catch((error: unknown) => {
+        params.signal?.throwIfAborted();
+        if (
+          error instanceof OAuthRefreshFailureError ||
+          error instanceof SecretSurfaceUnavailableError
+        ) {
+          throw error;
+        }
+        return result;
+      });
     }
     return result;
   }
@@ -613,8 +618,7 @@ export async function resolveApiKeyForProviderCore(input: {
     return syntheticLocalAuth;
   }
 
-  const hasInlineConfiguredModels =
-    Array.isArray(providerConfig?.models) && providerConfig.models.length > 0;
+  const hasInlineConfiguredModels = (providerConfig?.models?.length ?? 0) > 0;
   const owningPluginIds =
     params.allowAuthProfileFallback !== false && !hasInlineConfiguredModels
       ? resolveOwningPluginIdsForProviderRef({

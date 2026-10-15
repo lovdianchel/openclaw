@@ -227,10 +227,9 @@ async function resumeMainSessionWithinAdmission(
     return "skipped";
   }
   const lifecycleGeneration = params.lifecycleGeneration ?? getAgentEventLifecycleGeneration();
-  const sanitizedPendingText =
-    typeof params.pendingFinalDeliveryText === "string"
-      ? sanitizePendingFinalDeliveryText(params.pendingFinalDeliveryText)
-      : "";
+  const sanitizedPendingText = sanitizePendingFinalDeliveryText(
+    params.pendingFinalDeliveryText ?? "",
+  );
   const deliveryContext = resolveRestartRecoveryDeliveryContext({
     cfg: params.cfg,
     entry: params.entry,

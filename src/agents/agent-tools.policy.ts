@@ -45,7 +45,6 @@ import {
   resolveStoredSubagentInheritedToolDenylist,
   resolveStoredSubagentCapabilities,
   type SessionCapabilityStore,
-  type SubagentSessionRole,
 } from "./subagents/spawn/subagent-capabilities.js";
 import { createToolPolicyMatcher } from "./tool-policy-match.js";
 import type { ConfiguredToolPolicySources } from "./tool-policy-pipeline.js";
@@ -84,13 +83,6 @@ const SUBAGENT_TOOL_DENY_LEAF = [
   "sessions_spawn",
 ];
 
-function resolveSubagentDenyListForRole(role: SubagentSessionRole): string[] {
-  if (role === "leaf") {
-    return [...SUBAGENT_TOOL_DENY_ALWAYS, ...SUBAGENT_TOOL_DENY_LEAF];
-  }
-  return [...SUBAGENT_TOOL_DENY_ALWAYS];
-}
-
 export function resolveSubagentToolPolicyForSession(
   cfg: OpenClawConfig | undefined,
   sessionKey: string,
@@ -107,11 +99,12 @@ export function resolveSubagentToolPolicyForSession(
     cfg,
     store,
   });
-  const allow = Array.isArray(configured?.allow) ? configured.allow : undefined;
-  const alsoAllow = Array.isArray(configured?.alsoAllow) ? configured.alsoAllow : undefined;
+  const allow = configured?.allow;
+  const alsoAllow = configured?.alsoAllow;
   const deny = [
-    ...resolveSubagentDenyListForRole(capabilities.role),
-    ...(Array.isArray(configured?.deny) ? configured.deny : []),
+    ...SUBAGENT_TOOL_DENY_ALWAYS,
+    ...(capabilities.role === "leaf" ? SUBAGENT_TOOL_DENY_LEAF : []),
+    ...(configured?.deny ?? []),
   ];
   const mergedAllow = allow && alsoAllow ? uniqueStrings([...allow, ...alsoAllow]) : allow;
   return { allow: mergedAllow, deny };
@@ -149,13 +142,11 @@ export function resolveConfiguredToolPolicies(params: {
   extraPolicies?: readonly (SandboxToolPolicy | undefined)[];
 }): SandboxToolPolicy[] {
   const profile = params.agentTools?.profile ?? params.cfg.tools?.profile;
-  const profileAlsoAllow =
-    resolveExplicitProfileAlsoAllow(params.agentTools) ??
-    resolveExplicitProfileAlsoAllow(params.cfg.tools);
+  const profileAlsoAllow = params.agentTools?.alsoAllow ?? params.cfg.tools?.alsoAllow;
   const profilePolicy = mergeAlsoAllowPolicy(resolveToolProfilePolicy(profile), profileAlsoAllow);
   const policies = [
     profilePolicy,
-    pickSandboxToolPolicy(params.cfg.tools ?? undefined),
+    pickSandboxToolPolicy(params.cfg.tools),
     pickSandboxToolPolicy(params.agentTools),
     ...(params.extraPolicies ?? []),
   ].filter((policy): policy is SandboxToolPolicy => Boolean(policy));
@@ -283,12 +274,6 @@ export function resolveTrustedGroupId(params: {
   });
 }
 
-function resolveExplicitProfileAlsoAllow(
-  tools?: Pick<AgentToolsConfig, "alsoAllow">,
-): string[] | undefined {
-  return Array.isArray(tools?.alsoAllow) ? tools.alsoAllow : undefined;
-}
-
 function profileAllowsGatewayConfigReads(profile?: string, alsoAllow?: string[]): boolean {
   const policy = resolveToolProfilePolicy(profile);
   if (!policy?.allow || policy.allow.includes("*")) {
@@ -324,10 +309,7 @@ export function resolveEffectiveToolPolicy(params: {
   modelProvider?: string;
   modelId?: string;
 }) {
-  const explicitAgentId =
-    typeof params.agentId === "string" && params.agentId.trim()
-      ? normalizeAgentId(params.agentId)
-      : undefined;
+  const explicitAgentId = params.agentId?.trim() ? normalizeAgentId(params.agentId) : undefined;
   const agentEntries = params.config ? listAgentEntriesWithSource(params.config) : [];
   const canResolveConfiguredAgent =
     params.config && (!hasAgentRosterProperty(params.config) || agentEntries.length > 0);
@@ -422,8 +404,7 @@ export function resolveEffectiveToolPolicy(params: {
   ).flatMap(([tools, path, active]) =>
     tools?.profile && path ? [{ profile: tools.profile, source: `${path}.profile`, active }] : [],
   );
-  const explicitProfileAlsoAllow =
-    resolveExplicitProfileAlsoAllow(agentTools) ?? resolveExplicitProfileAlsoAllow(globalTools);
+  const explicitProfileAlsoAllow = agentTools?.alsoAllow ?? globalTools?.alsoAllow;
   const agentPolicy = pickSandboxToolPolicy(agentTools);
   const clawToolPolicyConsent = resolveClawToolPolicyConsent({
     agentTools,
@@ -450,9 +431,7 @@ export function resolveEffectiveToolPolicy(params: {
     profileAlsoAllow: explicitProfileAlsoAllow
       ? uniqueStrings(explicitProfileAlsoAllow)
       : undefined,
-    providerProfileAlsoAllow:
-      resolveExplicitProfileAlsoAllow(agentProviderPolicy) ??
-      resolveExplicitProfileAlsoAllow(providerPolicy),
+    providerProfileAlsoAllow: agentProviderPolicy?.alsoAllow ?? providerPolicy?.alsoAllow,
   };
 
   const gatewayConfigReadAllowed =
@@ -570,6 +549,7 @@ export function resolveGroupToolPolicyOutcome(params: {
   try {
     plugin = getLoadedChannelPlugin(channel);
   } catch {
+    // Plugin lookup failure leaves the canonical config policy fallback in charge.
     plugin = undefined;
   }
   if (params.requireConfiguredAccount && accountId !== DEFAULT_ACCOUNT_ID) {
@@ -580,6 +560,7 @@ export function resolveGroupToolPolicyOutcome(params: {
           .listAccountIds(params.config)
           .some((candidate) => normalizeAccountId(candidate) === accountId) === true;
     } catch {
+      // An unreadable account roster cannot authorize a scheduled named account.
       configured = false;
     }
     if (!configured) {

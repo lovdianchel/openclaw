@@ -36,7 +36,7 @@ export function summarizeCompactionMessages(messages: AgentMessage[]) {
   let estTokens: number | undefined = 0;
 
   for (const msg of messages) {
-    const role = typeof msg.role === "string" ? msg.role : "unknown";
+    const role = msg.role;
     const chars = getMessageTextChars(msg);
     historyTextChars += chars;
     if (role === "toolResult") {
