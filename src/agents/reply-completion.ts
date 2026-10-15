@@ -50,8 +50,17 @@ export function resolveCommandReplyExpectation(params: {
   sessionKey?: string;
   sessionEntry?: Pick<SessionEntry, "chatType">;
   messageChannel?: string;
-  opts: { lane?: string; privateCompletion?: true; inputProvenance?: InputProvenance };
+  opts: {
+    lane?: string;
+    privateCompletion?: true;
+    inputProvenance?: InputProvenance;
+    replyExpectation?: ReplyExpectation;
+  };
 }): ReplyExpectation | undefined {
+  const inputExpectation = params.opts.replyExpectation;
+  if (inputExpectation === "optional" || inputExpectation === "result-required") {
+    return inputExpectation;
+  }
   if (
     params.opts.privateCompletion ||
     params.opts.lane === AGENT_LANE_SUBAGENT ||
@@ -62,6 +71,9 @@ export function resolveCommandReplyExpectation(params: {
     !isDeliverableMessageChannel(params.messageChannel)
   ) {
     return "result-required";
+  }
+  if (inputExpectation === "required") {
+    return inputExpectation;
   }
   if (params.opts.inputProvenance?.kind !== "inter_session") {
     return undefined;

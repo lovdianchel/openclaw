@@ -346,7 +346,7 @@ it.for([
         expect(outcome).toMatchObject({ delivered: false, deliveryAttempted: false });
       }
       if (source.toolsAllow) {
-        expect(outcome.error).toContain("Session event admission no longer owns its destination");
+        expect(outcome.error).toContain("Session event permissions were restricted");
       }
       expect(completionSurfaces).toEqual([normalSurface]);
     } finally {

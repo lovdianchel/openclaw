@@ -492,7 +492,7 @@ describe("provider terminal reply delivery", () => {
                 const message = asOptionalObjectRecord(asOptionalObjectRecord(row)?.message);
                 return (
                   assistantText(message)?.trim() &&
-                  asOptionalObjectRecord(message.openclawDeliveryMirror)?.kind !== "model-fallback"
+                  asOptionalObjectRecord(message?.openclawDeliveryMirror)?.kind !== "model-fallback"
                 );
               }),
             ).toEqual([]);

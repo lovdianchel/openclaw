@@ -98,12 +98,18 @@ describe("readDescendantSubagentFallbackReply", () => {
       name: "visible",
       terminalReply: { disposition: "visible", text: "bounded child output" } as const,
       resultText: "authoritative full child output",
-      expected: "authoritative full child output",
+      expected: "bounded child output",
     },
     {
       name: "silent",
       terminalReply: { disposition: "silent" } as const,
-      resultText: "NO_REPLY",
+      resultText: "stale visible child output",
+      expected: undefined,
+    },
+    {
+      name: "empty",
+      terminalReply: { disposition: "empty" } as const,
+      resultText: "stale visible child output",
       expected: undefined,
     },
     {
@@ -132,26 +138,31 @@ describe("readDescendantSubagentFallbackReply", () => {
     },
   );
 
-  it("does not reconstruct missing terminal facts from a child transcript", async () => {
-    const descendant = createDescendantRun({ resultText: "NO_REPLY" });
-    descendant.execution.outcome = { status: "ok" };
-    descendant.completion = {
-      required: true,
-      resultText: "NO_REPLY",
-      fallbackResultText: "captured child findings",
-    };
-    vi.mocked(listDescendantRunsForRequester).mockResolvedValue([descendant]);
-    vi.mocked(readLatestAssistantReply).mockResolvedValue("stale child transcript");
-    vi.mocked(readLatestAssistantReply).mockClear();
-    await expect(
-      readDescendantSubagentFallbackReply({ sessionKey: "test-session", runStartedAt }),
-    ).resolves.toBeUndefined();
-    expect(readLatestAssistantReply).not.toHaveBeenCalled();
-  });
+  it.each(["NO_REPLY", "captured child answer"])(
+    "does not reconstruct missing terminal facts from retained output: %s",
+    async (resultText) => {
+      const descendant = createDescendantRun({ resultText });
+      descendant.execution.outcome = { status: "ok" };
+      descendant.completion = {
+        required: true,
+        resultText,
+        fallbackResultText: "captured child findings",
+      };
+      vi.mocked(listDescendantRunsForRequester).mockResolvedValue([descendant]);
+      vi.mocked(readLatestAssistantReply).mockResolvedValue("stale child transcript");
+      vi.mocked(readLatestAssistantReply).mockClear();
+      await expect(
+        readDescendantSubagentFallbackReply({ sessionKey: "test-session", runStartedAt }),
+      ).resolves.toBeUndefined();
+      expect(readLatestAssistantReply).not.toHaveBeenCalled();
+    },
+  );
 
-  it("skips SILENT_REPLY_TOKEN descendants", async () => {
+  it("skips descendants with producer-owned silence", async () => {
+    const silent = createDescendantRun({ resultText: "NO_REPLY" });
+    silent.completion = { required: true, terminalReply: { disposition: "silent" } };
     vi.mocked(listDescendantRunsForRequester).mockResolvedValue([
-      createDescendantRun(),
+      silent,
       createDescendantRun({
         runId: "run-2",
         childSessionKey: "child-2",
@@ -160,12 +171,6 @@ describe("readDescendantSubagentFallbackReply", () => {
         resultText: "useful output",
       }),
     ]);
-    vi.mocked(readLatestAssistantReply).mockImplementation(async (params) => {
-      if (params.sessionKey === "child-1") {
-        return "NO_REPLY";
-      }
-      return undefined;
-    });
     const result = await readDescendantSubagentFallbackReply({
       sessionKey: "test-session",
       runStartedAt,

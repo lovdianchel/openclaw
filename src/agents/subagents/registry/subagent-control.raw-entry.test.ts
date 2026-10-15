@@ -278,7 +278,6 @@ it.each([
       status: "timeout";
       startedAt: number;
       endedAt: number;
-      terminalReply: { disposition: "visible"; text: string };
     }>();
     fixture.gateway.mockImplementation(async (request) => {
       if (request.method !== "agent.wait") {
@@ -320,11 +319,11 @@ it.each([
         updatedAt: Date.now(),
       });
     }
+    // A timeout without producer reply metadata must read this child's own transcript.
     terminal.resolve({
       status: "timeout",
       startedAt: entry.createdAt,
       endedAt: Date.now(),
-      terminalReply: { disposition: "visible", text: `${owner}'s partial result` },
     });
     const waitIndex = waits.mock.calls.findIndex(([waitingRunId]) => waitingRunId === runId);
     expect(waitIndex).toBeGreaterThanOrEqual(0);
@@ -333,7 +332,7 @@ it.each([
     expect(fixture.capture).toHaveBeenCalledWith(
       "global",
       expect.objectContaining({
-        runId,
+        outcome: expect.objectContaining({ status: "timeout" }),
         sessionTarget: expect.objectContaining({ agentId: owner, sessionId: `${owner}-global` }),
       }),
     );

@@ -795,7 +795,8 @@ describe("trailing source progress at runtime settlement", () => {
     if (delivered) {
       expect(finalizerInstruction).toBeNull();
     } else {
-      expect(finalizerInstruction).toContain("did not produce a user-visible answer");
+      expect(finalizerInstruction).toContain("Your turn ended without a final reply.");
+      expect(finalizerInstruction).toContain("answer exactly NO_REPLY");
     }
   });
 });

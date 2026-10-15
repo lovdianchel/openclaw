@@ -1030,6 +1030,7 @@ describe("subagent registry seam flow", () => {
       });
     });
     await settleRootWork();
+    expect(mocks.captureSubagentCompletionReply).toHaveBeenCalledTimes(1);
     expect(
       mocks.callGateway.mock.calls.filter(([request]) => request.method === "agent.wait").length,
     ).toBeGreaterThanOrEqual(2);
@@ -1055,7 +1056,7 @@ describe("subagent registry seam flow", () => {
       );
       expect(mocks.runSubagentAnnounceFlow).toHaveBeenCalledTimes(1);
     });
-    expect(mocks.captureSubagentCompletionReply).not.toHaveBeenCalled();
+    expect(mocks.captureSubagentCompletionReply).toHaveBeenCalledTimes(1);
   });
 
   it("refreshes unpublished timeout delivery payloads after lifecycle correction", async () => {

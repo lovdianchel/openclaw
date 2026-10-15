@@ -1,5 +1,4 @@
 import { readLatestAssistantReply, waitForAgentRunsToDrain } from "../../agents/run-wait.js";
-import { resolveSubagentCompletionResultText } from "../../agents/subagents/completion/subagent-completion-result.js";
 import type { SubagentRunRecord } from "../../agents/subagents/registry/subagent-registry.types.js";
 import { isRetainedUnendedSubagentRun } from "../../agents/subagents/registry/subagent-run-liveness.js";
 import { bindAgentToolGatewayRequest } from "../../agents/tools/in-process-gateway.js";
@@ -30,11 +29,12 @@ export async function readDescendantSubagentFallbackReply(params: {
     .toSorted((a, b) => (a.execution.endedAt ?? 0) - (b.execution.endedAt ?? 0))
     .slice(-4);
   for (const entry of latestRuns) {
-    const reply = resolveSubagentCompletionResultText(entry);
-    if (!reply) {
+    // Retained result text cannot establish a terminal reply for cron settlement.
+    const terminalReply = entry.completion?.terminalReply;
+    if (terminalReply?.disposition !== "visible" || !terminalReply.text) {
       continue;
     }
-    replies.push(reply);
+    replies.push(terminalReply.text);
   }
   return replies.length ? replies.join("\n\n") : undefined;
 }

@@ -4,6 +4,7 @@ import { createRestartRecoveryClaimChangedError } from "../../infra/agent-lifecy
 import { resolveFallbackTransition } from "../fallback-state.js";
 import { getReplyPayloadMetadata } from "../reply-payload.js";
 import type { TemplateContext } from "../templating.js";
+import { SILENT_REPLY_TOKEN } from "../tokens.js";
 import {
   buildSilentFallbackFailurePayload,
   handleReplyAgentRunError,
