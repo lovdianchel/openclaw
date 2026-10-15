@@ -8,7 +8,7 @@ import {
 import { isEmbeddedAgentSessionHeldByOtherRun } from "../agents/embedded-agent-runner/runs.js";
 import { abortAndDrainEmbeddedAgentRun } from "../agents/embedded-agent.js";
 import { loadPreparedInboundPluginRegistry } from "../agents/prepared-model-runtime.inbound-registry.js";
-import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
+import { isSilentReplyPayloadText } from "../auto-reply/tokens.js";
 import type { CliDeps } from "../cli/deps.types.js";
 import { DEFAULT_CRON_ENABLED } from "../config/cron-limits.js";
 import { getRuntimeConfig } from "../config/io.js";
@@ -580,8 +580,7 @@ export function buildGatewayCronService(params: {
         abortSignal,
         nowMs: Date.now,
       });
-      const summaryIsSilent =
-        typeof result.summary === "string" && isSilentReplyText(result.summary, SILENT_REPLY_TOKEN);
+      const summaryIsSilent = isSilentReplyPayloadText(result.summary);
       const completion = await finalizeCronCompletionAnnouncement({
         deliveryAttemptFence,
         job,

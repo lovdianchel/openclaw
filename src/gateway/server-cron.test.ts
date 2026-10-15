@@ -1522,13 +1522,13 @@ describe("buildGatewayCronService", () => {
     }
   });
 
-  it("suppresses command cron NO_REPLY output before announce delivery", async () => {
+  it("suppresses command cron summaries ending in standalone NO_REPLY", async () => {
     const cfg = createCronConfig("server-cron-command-no-reply");
     await withCronService(cfg, async (state) => {
       const job = await addCommandJob(
         state,
         "silent-command",
-        "process.stdout.write('NO_REPLY\\n')",
+        "process.stdout.write('Scheduled report\\nNO_REPLY\\n')",
         {
           deleteAfterRun: false,
           delivery: {
@@ -1549,14 +1549,14 @@ describe("buildGatewayCronService", () => {
         deliverySuppressionReason: "silent",
       });
       expect(sendCronAnnouncePayloadStrictMock).not.toHaveBeenCalled();
-      expect(runCronChangedMock.mock.calls.map(([event]) => event)).toContainEqual(
-        expect.objectContaining({
-          jobId: job.id,
-          action: "finished",
-          completionStatus: "succeeded",
-          deliverySuppressionReason: "silent",
-        }),
-      );
+      const events = runCronChangedMock.mock.calls.map(([event]) => requireRecord(event, "cron"));
+      const finished = events.find((event) => event.action === "finished");
+      expect(finished).toMatchObject({
+        jobId: job.id,
+        completionStatus: "succeeded",
+        deliverySuppressionReason: "silent",
+      });
+      expect(finished).not.toHaveProperty("summary");
     });
   });
 
