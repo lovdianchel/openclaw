@@ -71,3 +71,16 @@ export function parseReplyDirectivesFromMedia(
     hasSilentIntent: isSilent,
   };
 }
+
+/** Retains deliverable text and media when projecting a parsed reply into a transcript. */
+export function serializeReplyDirectiveText(
+  parsed: Pick<ReplyDirectiveParseResult, "text" | "mediaUrls" | "audioAsVoice">,
+): string {
+  return [
+    parsed.text,
+    ...(parsed.audioAsVoice && parsed.mediaUrls?.length ? ["[[audio_as_voice]]"] : []),
+    ...(parsed.mediaUrls ?? []).map((url) => `MEDIA:${url}`),
+  ]
+    .filter(Boolean)
+    .join("\n");
+}

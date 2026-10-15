@@ -1,5 +1,8 @@
 import { asOptionalObjectRecord } from "@openclaw/normalization-core/record-coerce";
-import { parseReplyDirectivesFromMedia } from "../../auto-reply/reply/reply-directives-core.js";
+import {
+  parseReplyDirectivesFromMedia,
+  serializeReplyDirectiveText,
+} from "../../auto-reply/reply/reply-directives-core.js";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import { splitMediaOutput } from "../../media/parse-output.js";
 import { NESTED_TOOL_ACTIVITY_CUSTOM_TYPE } from "../../sessions/nested-tool-activity.js";
@@ -38,15 +41,7 @@ export function extractStoredAssistantText(message: unknown): string | undefined
   // Classify authored order before phase selection can revive a withdrawn answer.
   const parsed = parseReplyDirectivesFromMedia(splitMediaOutput(rawText));
   if (parsed.hasSilentIntent) {
-    return (
-      [
-        parsed.text,
-        ...(parsed.audioAsVoice && parsed.mediaUrls?.length ? ["[[audio_as_voice]]"] : []),
-        ...(parsed.mediaUrls ?? []).map((url) => `MEDIA:${url}`),
-      ]
-        .filter(Boolean)
-        .join("\n") || SILENT_REPLY_TOKEN
-    );
+    return serializeReplyDirectiveText(parsed) || SILENT_REPLY_TOKEN;
   }
   const joined =
     extractAssistantTextForPhase(message, {

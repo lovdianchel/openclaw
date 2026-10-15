@@ -448,8 +448,40 @@ describe("createAcpVisibleTextAccumulator", () => {
   it.each([
     { visibleText: "Internal reasoning.", rawText: "Internal reasoning.\nNO_REPLY" },
     { visibleText: "Internal reasoning.\nNO_REPLY" },
+    { visibleText: "Internal reasoning.\nNO_REPLY\n[[reply_to_current]]" },
+    {
+      visibleText: "Internal reasoning.",
+      rawText: "Internal reasoning.\nNO_REPLY\n[[reply_to_current]]",
+    },
   ])("classifies raw and visible completed terminal evidence: %j", (params) => {
     expect(buildAgentRunTerminalReplySnapshot(params)).toEqual({ disposition: "silent" });
+  });
+
+  it.each([
+    {
+      suffix: "MEDIA:https://example.test/chart.png",
+      text: "MEDIA:https://example.test/chart.png",
+    },
+    {
+      suffix: "[[audio_as_voice]]\nMEDIA:https://example.test/voice.ogg",
+      text: "[[audio_as_voice]]\nMEDIA:https://example.test/voice.ogg",
+    },
+    {
+      suffix: "MEDIA:media://inbound/",
+      text: "⚠️ Media not attached: Use a public HTTPS URL without credentials or attach a local file by a safe path.",
+    },
+  ])("retains terminal media without withdrawn prose: $suffix", ({ suffix, text }) => {
+    const rawText = `Internal reasoning.\nNO_REPLY\n${suffix}`;
+    expect(buildAgentRunTerminalReplySnapshot({ visibleText: rawText, rawText })).toEqual({
+      disposition: "visible",
+      text,
+    });
+    expect(
+      normalizeAgentRunTerminalReplySnapshot({ disposition: "visible", text: rawText }),
+    ).toEqual({
+      disposition: "visible",
+      text,
+    });
   });
 
   it("normalizes persisted terminal silence before truncating its text", () => {

@@ -1,7 +1,11 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
 import { truncateWithMarker } from "@openclaw/normalization-core/utf16-slice";
 import { stripInternalMetadataForDisplay } from "../auto-reply/reply/display-text-sanitize.js";
-import { isSilentReplyPayloadText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
+import {
+  parseReplyDirectivesFromMedia,
+  serializeReplyDirectiveText,
+} from "../auto-reply/reply/reply-directives-core.js";
+import { splitMediaOutput } from "../media/parse-output.js";
 import { normalizeAgentRunRouteChange } from "./agent-run-terminal-receipt.js";
 import type { AgentRunTerminalReplySnapshot } from "./agent-run-terminal-reply.types.js";
 
@@ -32,13 +36,19 @@ export function buildAgentRunTerminalReplySnapshot(params: {
   rawText?: string;
   terminalReplyKind?: "silent-empty";
 }): AgentRunTerminalReplySnapshot {
-  if (
-    params.terminalReplyKind === "silent-empty" ||
-    isSilentReplyPayloadText(params.rawText ?? params.visibleText, SILENT_REPLY_TOKEN)
-  ) {
+  if (params.terminalReplyKind === "silent-empty") {
     return { disposition: "silent" };
   }
-  const text = sanitizeAgentRunTerminalReplyText(params.visibleText ?? "");
+  const parsed = parseReplyDirectivesFromMedia(
+    splitMediaOutput(params.rawText ?? params.visibleText ?? ""),
+  );
+  const visibleText = parsed.hasSilentIntent
+    ? serializeReplyDirectiveText(parsed)
+    : (params.visibleText ?? "");
+  if (parsed.hasSilentIntent && !visibleText) {
+    return { disposition: "silent" };
+  }
+  const text = sanitizeAgentRunTerminalReplyText(visibleText);
   return text ? { disposition: "visible", text } : { disposition: "empty" };
 }
 

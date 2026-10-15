@@ -1,4 +1,5 @@
 import { isRecord } from "@openclaw/normalization-core/record-coerce";
+import { serializeReplyDirectiveText } from "../../auto-reply/reply/reply-directives-core.js";
 import { parseReplyDirectives } from "../../auto-reply/reply/reply-directives.js";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import type { AssistantDeliveryTtsFacts, AssistantMessage } from "../../llm/types.js";
@@ -89,7 +90,7 @@ export function projectAssistantTranscriptText(
   const authoredReply = parseReplyDirectives(extractAssistantAuthoredText(message));
   let text: string | undefined;
   if (authoredReply.hasSilentIntent) {
-    text = authoredReply.text || SILENT_REPLY_TOKEN;
+    text = serializeReplyDirectiveText(authoredReply) || SILENT_REPLY_TOKEN;
   } else if (Array.isArray(message.content) && typeof message.text !== "string") {
     const finalBlocks = readAssistantTextBlocksForPhase(message, "final_answer");
     text = extractAssistantAuthoredText({
