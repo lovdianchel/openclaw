@@ -357,6 +357,96 @@ describe("oMLX registered embedding provider", () => {
     expect(observedHeaders.get("x-omlx-key")).toBe(customKey);
   });
 
+  it("keeps embedding identity stable when custom authentication rotates", async () => {
+    const requests: Array<{ key: string | null; deployment: string | null }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const headers = new Request(input, init).headers;
+        requests.push({
+          key: headers.get("x-omlx-key"),
+          deployment: headers.get("x-deployment"),
+        });
+        return Response.json({ data: [{ index: 0, embedding: [1, 0] }] });
+      }),
+    );
+    const identities: Array<Record<string, unknown> | undefined> = [];
+    const scenarios: Array<{
+      key: string;
+      deployment: string;
+      remote?: { baseUrl: string; headers: Record<string, string> };
+    }> = [
+      { key: "fixture-key-before", deployment: "fixture-a" },
+      { key: "fixture-key-after", deployment: "fixture-a" },
+      { key: "fixture-key-after", deployment: "fixture-b" },
+      {
+        key: "fixture-key-after",
+        deployment: "fixture-b",
+        remote: {
+          baseUrl: "http://127.0.0.1:18002/v1",
+          headers: { "X-oMLX-Key": "fixture-route", "X-Deployment": "fixture-b" },
+        },
+      },
+    ];
+    for (const { key, deployment, remote } of scenarios) {
+      vi.stubEnv("OMLX_EMBED_TEST_KEY", key);
+      const result = await embeddingAdapter().create({
+        config: {
+          models: {
+            providers: {
+              omlx: {
+                baseUrl: "http://127.0.0.1:8000/v1",
+                api: "openai-completions",
+                request: {
+                  headers: { "X-Deployment": deployment },
+                  auth: {
+                    mode: "header",
+                    headerName: "X-oMLX-Key",
+                    value: "${OMLX_EMBED_TEST_KEY}",
+                  },
+                },
+                models: [],
+              },
+            },
+          },
+        },
+        model: "fixture-embedding",
+        remote,
+      });
+      await expect(result.provider?.embed("orchard")).resolves.toEqual([1, 0]);
+      identities.push(result.runtime?.cacheKeyData);
+    }
+    expect(requests).toEqual([
+      { key: "fixture-key-before", deployment: "fixture-a" },
+      { key: "fixture-key-after", deployment: "fixture-a" },
+      { key: "fixture-key-after", deployment: "fixture-b" },
+      { key: "fixture-route", deployment: "fixture-b" },
+    ]);
+    expect(identities).toEqual([
+      ...["fixture-a", "fixture-a", "fixture-b"].map((deployment) => ({
+        provider: "omlx",
+        baseUrl: "http://127.0.0.1:8000/v1",
+        model: "fixture-embedding",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "x-deployment": deployment,
+        },
+      })),
+      {
+        provider: "omlx",
+        baseUrl: "http://127.0.0.1:18002/v1",
+        model: "fixture-embedding",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "x-deployment": "fixture-b",
+          "x-omlx-key": "fixture-route",
+        },
+      },
+    ]);
+  });
+
   it.each([undefined, { "X-Visible": "fixture-header" }])(
     "rejects an unavailable effective header before sending embeddings (override: %j)",
     async (remoteHeaders) => {

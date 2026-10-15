@@ -47,6 +47,7 @@ type OpenAICompatibleEmbeddingClient = {
   baseUrl: string;
   endpointUrl: string;
   headers: Record<string, string>;
+  authHeaderName?: string;
   ssrfPolicy?: SsrFPolicy;
   model: string;
   dimensions?: number;
@@ -167,9 +168,14 @@ function isSensitiveHeaderName(name: string): boolean {
   );
 }
 
-function sanitizeCacheHeaders(headers: Record<string, string>): Record<string, string> | undefined {
+function sanitizeCacheHeaders(
+  headers: Record<string, string>,
+  authHeaderName?: string,
+): Record<string, string> | undefined {
   const safeHeaders = Object.fromEntries(
-    Object.entries(headers).filter(([name]) => !isSensitiveHeaderName(name)),
+    Object.entries(headers).filter(
+      ([name]) => name !== authHeaderName && !isSensitiveHeaderName(name),
+    ),
   );
   return Object.keys(safeHeaders).length > 0 ? safeHeaders : undefined;
 }
@@ -445,6 +451,10 @@ async function createOpenAICompatibleEmbeddingClient(
     baseUrl,
     endpointUrl: resolveEmbeddingEndpointUrl(baseUrl, "embeddings"),
     headers,
+    authHeaderName:
+      providerOwnsDestination && configuredProvider?.request?.auth?.mode === "header"
+        ? configuredProvider.request.auth.headerName.trim().toLowerCase()
+        : undefined,
     ssrfPolicy: resolveEmbeddingProviderSsrFPolicy({
       provider: providerId,
       api: configuredProvider?.api ?? "openai-completions",
@@ -487,7 +497,7 @@ export const openAICompatibleEmbeddingProviderAdapter: EmbeddingProviderAdapter 
         callOptions,
       });
     };
-    const cacheHeaders = sanitizeCacheHeaders(client.headers);
+    const cacheHeaders = sanitizeCacheHeaders(client.headers, client.authHeaderName);
     return {
       provider: {
         id: OPENAI_COMPATIBLE_EMBEDDING_PROVIDER_ID,
