@@ -164,11 +164,12 @@ describe("incomplete-turn recovery policy", () => {
   );
 
   it.each([
-    { answer: "The earlier answer.", commentary: "NO_REPLY" },
-    { answer: "NO_REPLY", commentary: "This is still commentary." },
+    { answer: "The earlier answer.", commentary: "NO_REPLY", retry: false },
+    { answer: "The earlier answer.", commentary: "\nNO_REPLY", retry: true },
+    { answer: "NO_REPLY", commentary: "This is still commentary.", retry: true },
   ])(
-    "still requests a required answer after phased silence: $answer / $commentary",
-    ({ answer, commentary }) => {
+    "retries only missing phased answers: $answer / $commentary",
+    ({ answer, commentary, retry }) => {
       const assistant = emptyAssistant({
         content: [
           {
@@ -191,7 +192,7 @@ describe("incomplete-turn recovery policy", () => {
           timedOut: false,
           attempt: emptyAttempt(assistant),
         }),
-      ).toBe(EMPTY_RESPONSE_RETRY_INSTRUCTION);
+      ).toBe(retry ? EMPTY_RESPONSE_RETRY_INSTRUCTION : null);
     },
   );
 

@@ -399,7 +399,9 @@ src/auto-reply/reply/delivery-hints.ts
 src/auto-reply/reply/display-text-sanitize.ts
 src/auto-reply/reply/history-limit.ts
 src/auto-reply/reply/inbound-context-marker.ts
+src/auto-reply/reply/mixed-silent-reply-tokens.ts
 src/auto-reply/reply/reply-directives-core.ts
+src/auto-reply/reply/reply-directives.ts
 src/auto-reply/reply/strip-inbound-meta.ts
 src/auto-reply/thinking.shared.ts
 src/auto-reply/tokens.ts
@@ -1306,6 +1308,7 @@ src/llm/types.ts
 src/media/inbound-media-uri.ts
 src/media/media-facts.ts
 src/media/parse-output.ts
+src/media/parse.ts
 src/media/staged-inputs.ts
 src/memory-host-sdk/host/config-utils.ts
 src/memory/root-memory-files.ts
@@ -2232,6 +2235,7 @@ packages/gateway-protocol/src/schema/users.ts
 packages/gateway-protocol/src/schema/wizard.ts
 packages/markdown-core/src/fences.ts
 packages/markdown-core/src/image-code-retention.ts
+packages/markdown-core/src/image-spans.ts
 packages/markdown-core/src/reasoning-tag-parser.ts
 packages/markdown-core/src/reasoning-tags.ts
 packages/media-core/src/base64.ts

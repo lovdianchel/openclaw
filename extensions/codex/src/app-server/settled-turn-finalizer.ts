@@ -1,9 +1,9 @@
+import { buildAgentRunTerminalReplySnapshot } from "openclaw/plugin-sdk/agent-harness-attempt-runtime";
 import type {
   AgentHarnessV2,
   AgentHarnessSettledTurnFinalizationResult,
 } from "openclaw/plugin-sdk/agent-harness-runtime";
 import { createNativeSessionBindingScope } from "openclaw/plugin-sdk/agent-harness-session-runtime";
-import { parseReplyDirectives } from "openclaw/plugin-sdk/reply-payload";
 import { resolveCodexAppServerPreparedAuthHandoff } from "./auth-bridge.js";
 import { resolveCodexBoundedTurnIsolation } from "./bounded-turn-isolation.js";
 import { runBoundedCodexAppServerTurn, type CodexBoundedTurnOptions } from "./bounded-turn.js";
@@ -111,8 +111,8 @@ export async function runCodexSettledTurnFinalization(
   });
   // The host distinguishes authored silence from missing output. Preserve the
   // sentinel for its optional/required policy without mirroring a non-answer.
-  const reply = parseReplyDirectives(text);
-  if (!text || (reply.isSilent && !reply.mediaUrls?.length)) {
+  const reply = buildAgentRunTerminalReplySnapshot({ rawText: text, visibleText: text });
+  if (!text || reply.disposition === "silent") {
     return { assistant, ...(bounded.usage ? { usage: bounded.usage } : {}) };
   }
 

@@ -1,4 +1,5 @@
 /** Production-private attempt lifecycle mechanics for official harness plugins. */
+export { buildAgentRunTerminalReplySnapshot } from "../agents/agent-run-terminal-reply.js";
 export { buildCurrentInboundPrompt } from "../agents/embedded-agent-runner/run/runtime-context-prompt.js";
 export {
   createAgentHarnessAttemptDeadlineController,

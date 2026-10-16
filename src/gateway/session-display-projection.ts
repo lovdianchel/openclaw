@@ -1,8 +1,9 @@
 import { flattenMarkdownToPlainText } from "@openclaw/normalization-core/markdown-plain-text";
 import { asOptionalRecord as readRecord } from "@openclaw/normalization-core/record-coerce";
 import { truncateUtf16Safe } from "@openclaw/normalization-core/utf16-slice";
-import { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
+import { parseReplyDirectivesFromMedia } from "../auto-reply/reply/reply-directives-core.js";
 import type { SessionPreviewItem } from "../config/sessions/session-history-read.types.js";
+import { splitMediaOutput } from "../media/parse-output.js";
 import { projectAssistantDisplayContent } from "../shared/assistant-display-content.js";
 import { stripEnvelope } from "../shared/chat-envelope.js";
 import {
@@ -74,7 +75,9 @@ export function projectSessionDisplayMessage(
   const extracted =
     role === "assistant" ? extractAssistantPhaseText(projectedEntry) : extractUserText(entry);
   const authoredReply =
-    role === "assistant" ? parseReplyDirectives(extractAssistantAuthoredText(entry)) : undefined;
+    role === "assistant"
+      ? parseReplyDirectivesFromMedia(splitMediaOutput(extractAssistantAuthoredText(entry)))
+      : undefined;
   let text = authoredReply?.hasSilentIntent ? authoredReply.text : extracted;
   if (text && role === "assistant" && options.view !== "model-context") {
     text = stripAssistantMediaDirectivesForDisplay(

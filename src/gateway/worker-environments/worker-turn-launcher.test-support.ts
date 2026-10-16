@@ -10,9 +10,11 @@ import {
   createOperationalRunInstanceRef,
   prepareAgentRunAdmission,
 } from "../../agents/admitted-run-context.js";
+import type { AgentRunTerminalReplySnapshot } from "../../agents/agent-run-terminal-reply.types.js";
 import { waitForEmbeddedAgentRunEnd } from "../../agents/embedded-agent-runner/runs.js";
 import type { SessionPlacementTurnParams } from "../../agents/session-placement-admission.js";
 import { SessionManager } from "../../agents/sessions/session-manager.js";
+import type { makeAgentAssistantMessage } from "../../agents/test-helpers/agent-message-fixtures.js";
 import { CORE_WORKER_LAUNCH_TOOL_NAMES } from "../../agents/tool-catalog.js";
 import { clearRuntimeConfigSnapshot, setRuntimeConfigSnapshot } from "../../config/io.js";
 import { captureRuntimeConfigAsyncReader } from "../../config/io.runtime.js";
@@ -58,6 +60,73 @@ import { createWorkerSessionPlacementGate } from "./placement-worker-gate.js";
 import type { WorkerTurnTunnelHandle } from "./tunnel-contract.js";
 import { createWorkerSessionTurnPlacementProvider as createRawWorkerSessionTurnPlacementProvider } from "./worker-turn-launcher.js";
 import { createWorkerWorkspaceOperationCoordinator } from "./workspace-operation-coordinator.js";
+
+export const workerTerminalReplyCases: Array<{
+  name: string;
+  content: Parameters<typeof makeAgentAssistantMessage>[0]["content"];
+  visibleText?: string;
+  rawText?: string;
+  terminalReply: AgentRunTerminalReplySnapshot;
+  costs?: { first: number; last: number; total: number };
+}> = [
+  {
+    name: "visible final answer",
+    costs: { first: 0.125, last: 0.25, total: 0.375 },
+    content: [
+      { type: "thinking", thinking: "Private reasoning" },
+      {
+        type: "text",
+        text: "Working...",
+        textSignature: JSON.stringify({ v: 1, id: "commentary", phase: "commentary" }),
+      },
+      {
+        type: "text",
+        text: "Usage reply",
+        textSignature: JSON.stringify({ v: 1, id: "final", phase: "final_answer" }),
+      },
+    ],
+    visibleText: "Usage reply",
+    rawText: "Usage reply",
+    terminalReply: { disposition: "visible", text: "Usage reply" },
+  },
+  {
+    name: "sanitized final answer",
+    content: [{ type: "text", text: "<think>Private reasoning</think>Usage reply" }],
+    visibleText: "Usage reply",
+    rawText: "<think>Private reasoning</think>Usage reply",
+    terminalReply: { disposition: "visible", text: "Usage reply" },
+  },
+  {
+    name: "explicit silence",
+    content: [{ type: "text", text: "NO_REPLY" }],
+    rawText: "NO_REPLY",
+    terminalReply: { disposition: "silent" },
+  },
+  {
+    name: "final-line silence",
+    content: [
+      { type: "text", text: "Private narration." },
+      { type: "text", text: "\nNO_REPLY" },
+    ],
+    rawText: "Private narration.\nNO_REPLY",
+    terminalReply: { disposition: "silent" },
+  },
+  {
+    name: "reasoning-only completion",
+    content: [{ type: "thinking", thinking: "Private reasoning" }],
+    terminalReply: { disposition: "empty" },
+  },
+  {
+    name: "tool-only completion",
+    content: [{ type: "toolCall", id: "call-final", name: "read", arguments: {} }],
+    terminalReply: { disposition: "empty" },
+  },
+  {
+    name: "empty final answer",
+    content: [],
+    terminalReply: { disposition: "empty" },
+  },
+];
 
 export type WorkerTurnLauncherOptions = Parameters<
   typeof createRawWorkerSessionTurnPlacementProvider

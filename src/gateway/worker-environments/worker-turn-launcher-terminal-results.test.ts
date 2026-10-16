@@ -8,7 +8,6 @@ import {
 } from "../../../packages/gateway-protocol/src/schema/worker-admission.js";
 import { makeTextToolResult } from "../../../test/helpers/text-tool-result.js";
 import { buildAgentRunTerminalReplySnapshot } from "../../agents/agent-run-terminal-reply.js";
-import type { AgentRunTerminalReplySnapshot } from "../../agents/agent-run-terminal-reply.types.js";
 import { runEmbeddedAgentEntry } from "../../agents/embedded-agent-runner/run-entry.js";
 import { runEmbeddedAgent } from "../../agents/embedded-agent-runner/run.js";
 import { waitForEmbeddedAgentRunEnd } from "../../agents/embedded-agent-runner/runs.js";
@@ -80,6 +79,7 @@ import {
   setupWorkerTurnLauncherTest,
   turn,
   unusedEnvironments,
+  workerTerminalReplyCases,
   type WorkerTurnEnvironmentService,
 } from "./worker-turn-launcher.test-support.js";
 import { createWorkerWorkspaceOperationCoordinator } from "./workspace-operation-coordinator.js";
@@ -842,64 +842,7 @@ describe("worker turn launcher terminal results", () => {
     expect(destroy).not.toHaveBeenCalled();
   });
 
-  it.each<{
-    name: string;
-    content: Parameters<typeof makeAgentAssistantMessage>[0]["content"];
-    visibleText?: string;
-    rawText?: string;
-    terminalReply: AgentRunTerminalReplySnapshot;
-    costs?: { first: number; last: number; total: number };
-  }>([
-    {
-      name: "visible final answer",
-      costs: { first: 0.125, last: 0.25, total: 0.375 },
-      content: [
-        { type: "thinking", thinking: "Private reasoning" },
-        {
-          type: "text",
-          text: "Working...",
-          textSignature: JSON.stringify({ v: 1, id: "commentary", phase: "commentary" }),
-        },
-        {
-          type: "text",
-          text: "Usage reply",
-          textSignature: JSON.stringify({ v: 1, id: "final", phase: "final_answer" }),
-        },
-      ],
-      visibleText: "Usage reply",
-      rawText: "Usage reply",
-      terminalReply: { disposition: "visible", text: "Usage reply" },
-    },
-    {
-      name: "sanitized final answer",
-      content: [{ type: "text", text: "<think>Private reasoning</think>Usage reply" }],
-      visibleText: "Usage reply",
-      rawText: "<think>Private reasoning</think>Usage reply",
-      terminalReply: { disposition: "visible", text: "Usage reply" },
-    },
-    {
-      name: "explicit silence",
-      content: [{ type: "text", text: "NO_REPLY" }],
-      visibleText: "NO_REPLY",
-      rawText: "NO_REPLY",
-      terminalReply: { disposition: "silent" },
-    },
-    {
-      name: "reasoning-only completion",
-      content: [{ type: "thinking", thinking: "Private reasoning" }],
-      terminalReply: { disposition: "empty" },
-    },
-    {
-      name: "tool-only completion",
-      content: [{ type: "toolCall", id: "call-final", name: "read", arguments: {} }],
-      terminalReply: { disposition: "empty" },
-    },
-    {
-      name: "empty final answer",
-      content: [],
-      terminalReply: { disposition: "empty" },
-    },
-  ])(
+  it.each(workerTerminalReplyCases)(
     "reports canonical usage and $name",
     async ({
       content,
