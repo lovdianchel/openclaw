@@ -76,6 +76,7 @@ export function linkPrWrapperDependencies(destination: string): void {
     );
   }
   for (const dependency of [
+    "markdown-it",
     "mdast-util-from-markdown",
     "mdast-util-gfm-table",
     "micromark-extension-gfm-table",
