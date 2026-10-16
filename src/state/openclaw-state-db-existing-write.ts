@@ -10,7 +10,7 @@ import {
 import { assertNoActiveSqliteReaders } from "../infra/sqlite-reader-lifecycle.js";
 import {
   assertSqliteSchemaContains,
-  getCanonicalSqliteNamedIndexContracts,
+  getCanonicalSqliteNamedIndexNames,
   getCanonicalSqliteTableNames,
   type SqliteSchemaCompatibility,
 } from "../infra/sqlite-schema-contract.js";
@@ -169,7 +169,7 @@ function createExistingOpenClawStateWriter(
   const ensureAdditiveSchema = contract.initializeAdditiveSchema
     ? createSqliteSchemaEnsurer(() => contract.schemaSql, {
         tables: getCanonicalSqliteTableNames(contract.schemaSql),
-        indexes: getCanonicalSqliteNamedIndexContracts(contract.schemaSql).map(({ name }) => name),
+        indexes: getCanonicalSqliteNamedIndexNames(contract.schemaSql),
       })
     : undefined;
   let closed = false;

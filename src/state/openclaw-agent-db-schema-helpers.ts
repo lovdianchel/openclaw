@@ -6,7 +6,7 @@ import {
   assertSqliteSchemaContains,
   assertSqliteSchemaTablesPresent,
   collectSqliteSchemaIssues,
-  getCanonicalSqliteNamedIndexContracts,
+  getCanonicalSqliteNamedIndexNames,
   getCanonicalSqliteTableNames,
 } from "../infra/sqlite-schema-contract.js";
 import { getAdmittedSqliteSchemaFacts } from "../infra/sqlite-schema-facts.js";
@@ -99,9 +99,7 @@ export function assertOpenClawAgentSchemaContains(
   }
   // Admission is read-only; the writable schema owner rebuilds these projections
   // before session startup completes. Constraints and canonical data stay strict.
-  const repairableIndexes = new Set(
-    getCanonicalSqliteNamedIndexContracts(schemaSql).map((index) => index.name),
-  );
+  const repairableIndexes = new Set(getCanonicalSqliteNamedIndexNames(schemaSql));
   const issues = collectSqliteSchemaIssues(database, schemaSql, compatibility);
   if (
     issues.some(
@@ -289,9 +287,6 @@ export function finishAgentSchemaMigration(
   requiresMaintenance: boolean,
   assertMigration: () => void,
 ): void {
-  repairCanonicalSqliteIndexes(db, pathname, schemaSql, {
-    verifyPhysicalIntegrity: false,
-  });
   db.exec(`PRAGMA user_version = ${targetVersion};`);
   persistAgentSchemaMetadata(db, agentId, targetVersion);
   assertAgentSchemaVersion(db, { agentId, pathname, version: targetVersion }, schemaSql);

@@ -1,3 +1,4 @@
+import type { DatabaseSync } from "node:sqlite";
 import { extractSqliteTableSchema } from "../../src/infra/sqlite-schema-sql.js";
 import { OPENCLAW_AGENT_SCHEMA_VERSION } from "../../src/state/openclaw-agent-db-contract.js";
 import {
@@ -26,17 +27,17 @@ import { OPENCLAW_STATE_SCHEMA_SQL } from "../../src/state/openclaw-state-schema
 
 export type SqliteSchemaInput = {
   id: string;
-  store: "state" | "agent";
+  store: string;
   sql: string;
+  /** Build-only setup for computed fragments that require extensions, such as dimensioned vec0 DDL. */
+  prepare?: (database: DatabaseSync) => void | Promise<void>;
 };
 
 /** Exact source strings accepted by state and agent expected-schema inspection. */
 export function listSqliteSchemaInputs(): SqliteSchemaInput[] {
-  const inputs = new Map<string, SqliteSchemaInput>();
+  const inputs: SqliteSchemaInput[] = [];
   const add = (id: string, store: SqliteSchemaInput["store"], sql: string) => {
-    if (!inputs.has(sql)) {
-      inputs.set(sql, { id, store, sql });
-    }
+    inputs.push({ id, store, sql });
   };
   add("state", "state", OPENCLAW_STATE_SCHEMA_SQL);
   add("agent", "agent", OPENCLAW_AGENT_SCHEMA_SQL);
@@ -153,5 +154,5 @@ export function listSqliteSchemaInputs(): SqliteSchemaInput[] {
     add(id, "agent", sql);
   }
 
-  return [...inputs.values()];
+  return inputs;
 }

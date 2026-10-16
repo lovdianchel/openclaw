@@ -1,5 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
-import { readGeneratedSqliteCatalog } from "../state/postgres-schema.generated/sqlite-catalogs.js";
+import {
+  readGeneratedSqliteCatalog,
+  readGeneratedSqliteFingerprint,
+} from "../state/postgres-schema.generated/sqlite-catalogs.js";
 import { executeWithCachedStatement } from "./kysely-sync-cache-state.js";
 import { runSqliteSchemaReadSnapshotSync } from "./sqlite-pinned-read-snapshot.js";
 import {
@@ -20,6 +23,7 @@ import {
   type SqliteTableContract,
   type SqliteTableDefinition,
 } from "./sqlite-schema-contract-assembly.js";
+import { fingerprintSqliteSchemaCatalog } from "./sqlite-schema-fingerprint.js";
 import {
   createSqliteSchemaIssue,
   legacySqliteSchemaIssueMessages,
@@ -43,6 +47,7 @@ type SqliteSchemaContract = ReadonlyMap<string, SqliteTableContract>;
 export type { SqliteSchemaSource } from "./sqlite-schema-catalog.js";
 
 export type SqliteTableContractReader = ((tableName: string) => SqliteTableContract | undefined) & {
+  readCatalog?: (viewNames: readonly string[]) => SqliteSchemaCatalog;
   readView?: (viewName: string) => SqliteViewCatalog | undefined;
 };
 
@@ -66,6 +71,10 @@ export function createSqliteTableContractReader(
     (tableName: string) =>
       (tables ??= sqliteSchemaContractFromCatalog(readCatalog())).get(tableName),
     {
+      readCatalog: (expectedViewNames: readonly string[]) =>
+        expectedViewNames.every((name) => viewNames.includes(name))
+          ? readCatalog()
+          : readSqliteSchemaCatalog(database, { viewNames: expectedViewNames }),
       readView: (viewName: string) => {
         const views = viewNames.includes(viewName)
           ? readCatalog().views
@@ -111,9 +120,16 @@ function collectSqliteSchemaIssuesInSnapshot(
   compatibility: SqliteSchemaCompatibility,
   readTable: SqliteTableContractReader | undefined,
 ): SqliteSchemaIssue[] {
-  const expected = getSqliteSchemaContract(schemaSql);
-  const expectedViewNames = expected.catalog.views.map((view) => view.name);
+  const descriptor =
+    typeof schemaSql === "string" ? readGeneratedSqliteFingerprint(schemaSql) : undefined;
+  const expectedViewNames =
+    descriptor?.viewNames ??
+    getSqliteSchemaContract(schemaSql).catalog.views.map((view) => view.name);
   const readActualTable = readTable ?? createSqliteTableContractReader(database, expectedViewNames);
+  if (hasCanonicalSqliteSchemaFingerprint(schemaSql, readActualTable, compatibility)) {
+    return [];
+  }
+  const expected = getSqliteSchemaContract(schemaSql);
   const excludedTables = new Set(compatibility.excludedTables ?? []);
   const excludedIndexes = new Set(compatibility.excludedIndexes ?? []);
   const allowedMissingTables = new Set(compatibility.allowedMissingTables ?? []);
@@ -348,7 +364,85 @@ export function getCanonicalSqliteNamedIndexContracts(
 
 /** Return every table owned by one committed schema. */
 export function getCanonicalSqliteTableNames(schemaSql: SqliteSchemaSource): string[] {
+  if (typeof schemaSql === "string") {
+    const descriptor = readGeneratedSqliteFingerprint(schemaSql);
+    if (descriptor) {
+      return [...descriptor.tableNames];
+    }
+  }
   return [...getSqliteSchemaContract(schemaSql).tables.keys()];
+}
+
+/** Read index membership without materializing diagnostic catalog facts. */
+export function getCanonicalSqliteNamedIndexNames(schemaSql: SqliteSchemaSource): string[] {
+  if (typeof schemaSql === "string") {
+    const descriptor = readGeneratedSqliteFingerprint(schemaSql);
+    if (descriptor) {
+      return [...descriptor.indexNames];
+    }
+  }
+  return getCanonicalSqliteNamedIndexContracts(schemaSql).map((index) => index.name);
+}
+
+/** A matching native catalog needs neither expected DDL execution nor full diagnostic facts. */
+export function hasCanonicalSqliteSchemaFingerprint(
+  schemaSql: SqliteSchemaSource,
+  readTable: SqliteTableContractReader,
+  compatibility: SqliteSchemaCompatibility = {},
+): boolean {
+  const descriptor =
+    typeof schemaSql === "string" ? readGeneratedSqliteFingerprint(schemaSql) : undefined;
+  if (!descriptor || !readTable.readCatalog) {
+    return false;
+  }
+  const catalog = readTable.readCatalog(descriptor.viewNames);
+  if (fingerprintSqliteSchemaCatalog(catalog, descriptor) !== descriptor.fingerprint) {
+    return false;
+  }
+  for (const group of compatibility.optionalCanonicalTriggerGroups ?? []) {
+    if (
+      !descriptor.tableNames.includes(group.tableName) ||
+      compatibility.excludedTables?.includes(group.tableName)
+    ) {
+      continue;
+    }
+    // The matching fingerprint includes every declared table.
+    const triggers = catalog.tables.find((table) => table.name === group.tableName)!.triggers;
+    const optional =
+      !group.optionalWhenTableMissing ||
+      !catalog.tables.some((table) => table.name === group.optionalWhenTableMissing);
+    if (
+      optional &&
+      !triggers.some((actual) => group.triggers.some((t) => t.name === actual.name))
+    ) {
+      continue;
+    }
+    if (
+      !group.triggers.every((trigger) =>
+        containsTrigger(triggers, {
+          name: trigger.name,
+          sql: normalizeOptionalCanonicalTriggerSql(trigger.sql),
+        }),
+      )
+    ) {
+      return false;
+    }
+  }
+  if (!compatibility.excludedIndexes?.length) {
+    return true;
+  }
+  // Excluding a named unique index makes its actual uniqueness unexpected.
+  return !catalog.tables.some(
+    (table) =>
+      descriptor.tableNames.includes(table.name) &&
+      !compatibility.excludedTables?.includes(table.name) &&
+      table.indexes.some(
+        (index) =>
+          index.origin === "c" &&
+          index.unique === 1 &&
+          compatibility.excludedIndexes?.includes(index.name),
+      ),
+  );
 }
 
 /** Inspect one explicit main-schema index using the canonical schema fingerprint shape. */

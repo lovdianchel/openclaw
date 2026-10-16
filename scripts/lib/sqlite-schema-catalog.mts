@@ -37,7 +37,8 @@ export function readSqliteSchemaCatalog(db: DatabaseSync): SqliteSchemaCatalog {
           SqliteIndexListRow & { seq: number }
         >;
         return {
-          ...normalized(table),
+          name: table.name,
+          sql: normalizeSchemaSql(table.sql),
           strict: tableOptions.strict,
           withoutRowid: tableOptions.wr,
           columns: db.prepare(`PRAGMA main.table_xinfo(${quoted})`).all() as SqliteColumnCatalog[],
@@ -66,7 +67,8 @@ export function readSqliteSchemaCatalog(db: DatabaseSync): SqliteSchemaCatalog {
     views: objects
       .filter((row) => row.type === "view")
       .map((view) => ({
-        ...normalized(view),
+        name: view.name,
+        sql: normalizeSchemaSql(view.sql),
         columns: db
           .prepare(`PRAGMA main.table_xinfo(${quoteSqliteIdentifier(view.name)})`)
           .all() as SqliteColumnCatalog[],

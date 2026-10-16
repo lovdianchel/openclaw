@@ -9,6 +9,8 @@ export const SQLITE_PRIMITIVE_OWNERS: readonly string[] = [
   "src/infra/sqlite-migration-scoped-snapshot.ts",
   // SQLite admission catalogs own native schema/PRAGMA facts; PostgreSQL has its own catalog owner.
   "src/infra/sqlite-schema-catalog.ts",
+  // SQLite planner-statistics owner: bounded optimization under existing writer admission.
+  "src/infra/sqlite-planner-statistics.ts",
 ];
 export type DialectMatch = {
   construct: string;

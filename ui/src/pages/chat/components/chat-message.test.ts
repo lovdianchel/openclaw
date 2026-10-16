@@ -1030,7 +1030,8 @@ describe("grouped chat rendering", () => {
     expect(renderTimestamp(oldTimestamp)).toBe(
       new Date(oldTimestamp).toLocaleDateString([], { month: "short", day: "numeric" }),
     );
-    expect(renderTimestamp(now + 30_000)).toBe("just now");
+    expect(renderTimestamp(now + 30_000)).toBe("Just now");
+    expect(renderTimestamp(now - 10_000)).toBe("Just now");
 
     const nextYear = Date.UTC(2027, 3, 24, 18, 30);
     expect(renderTimestamp(nextYear)).toBe(
@@ -1098,16 +1099,39 @@ describe("grouped chat rendering", () => {
 
     expect(view.querySelectorAll(".chat-group.assistant")).toHaveLength(1);
     expect(view.querySelector(".chat-working-indicator")).toBeNull();
-    expect(elementText(".chat-turn-recap--continuation")).toContain("Done in 4 hours, 2 minutes");
-    expect(elementText(".chat-turn-recap--continuation")).toContain("1 output token");
+    // Usage leads and the duration follows, matching the live indicator's order.
+    expect(
+      Array.from(view.querySelector(".chat-turn-recap--continuation")!.children, (child) =>
+        child.textContent?.trim(),
+      ),
+    ).toEqual(["1 output token", "·", "Done in 4 hours, 2 minutes"]);
     expect(view.querySelector(".chat-turn-recap__claw")).toBeNull();
     expect(view.querySelector(".chat-group-footer")).not.toBeNull();
+  });
+
+  it("shows live output tokens before the elapsed time", () => {
+    render(
+      renderStreamGroup([{ kind: "reading-indicator", key: "reading", startedAt: 1_000 }], {
+        runOutputTokens: 892,
+      }),
+      view,
+    );
+
+    const status = view.querySelector(".chat-working-indicator__status");
+    const tokens = status?.querySelector(".chat-working-indicator__tokens");
+    const elapsed = status?.querySelector(".chat-working-indicator__elapsed");
+    expect(tokens?.textContent).toBe("892 output tokens");
+    expect(elapsed).not.toBeNull();
+    expect(
+      tokens!.compareDocumentPosition(elapsed!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(status?.querySelector("openclaw-working-phrase")).toBeNull();
   });
 
   it("relabels the working indicator while the run waits for approval", () => {
     render(
       renderStreamGroup([{ kind: "reading-indicator", key: "reading", startedAt: 1_000 }], {
-        startupLabel: "Waiting for a response…",
+        startupLabel: "Waiting for a response",
         waitingApproval: true,
         runOutputTokens: 5_500,
       }),
@@ -1939,10 +1963,12 @@ describe("grouped chat rendering", () => {
       "https://example.com/photo.png",
     );
     expectElement(container, ".chat-message-image-button", HTMLButtonElement).click();
-    expect(onOpenImage).toHaveBeenCalledWith({
-      src: "https://example.com/photo.png",
-      title: "photo.png",
-    });
+    expect(onOpenImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        src: "https://example.com/photo.png",
+        title: "photo.png",
+      }),
+    );
     const audioPlayer = expectElement(
       container,
       "openclaw-chat-audio-player",
@@ -2493,7 +2519,7 @@ describe("grouped chat rendering", () => {
       expect(image?.getAttribute("src")).toBe(objectUrl);
       expect(image?.getAttribute("alt")).toBe("Generated image 1");
     });
-    const thumbnailUrl = `/rosita${managedChatImageUrl.replace(/\/full$/u, "/thumbnail")}?v=2`;
+    const thumbnailUrl = `/rosita${managedChatImageUrl.replace(/\/full$/u, "/thumbnail")}?v=4&width=480`;
     const [, fetchInit] = requireFetchCallForUrl(fetchMock, thumbnailUrl);
     expectSameOriginGet(fetchInit);
     expectElement(view, ".chat-message-image-button", HTMLButtonElement).click();
@@ -2572,10 +2598,10 @@ describe("grouped chat rendering", () => {
     const artifactId = `artifact_managed_image_${attachmentId}`;
     const source = `/api/chat/media/outgoing/agent%3Amain%3Amain/${attachmentId}/full`;
     const ticketedUrl = `${source}?mediaTicket=ticket`;
-    const thumbnailUrl = `${ticketedUrl.replace(/\/full(?=\?)/u, "/thumbnail")}&v=2`;
+    const thumbnailUrl = `${ticketedUrl.replace(/\/full(?=\?)/u, "/thumbnail")}&v=4&width=480`;
     const resolveArtifactDownload = vi.fn(async () => ({ url: ticketedUrl }));
     const objectUrls = ["blob:thumbnail", "blob:full", "blob:download"];
-    stubObjectUrls(() => objectUrls.shift() ?? "blob:extra");
+    const { revokeObjectURL } = stubObjectUrls(() => objectUrls.shift() ?? "blob:extra");
     const imageBlob = new Blob(["png"], { type: "image/png" });
     const fetchMock = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => ({
       ok: true,
@@ -2604,6 +2630,8 @@ describe("grouped chat rendering", () => {
         container.querySelector(".chat-image-actions .oc-menu")!.matches(":popover-open"),
       ).toBe(true),
     );
+    // Own the delayed download cleanup before restoring the URL globals.
+    vi.useFakeTimers();
     container
       .querySelector<HTMLButtonElement>('.chat-image-actions [data-value="download"]')!
       .click();
@@ -2614,6 +2642,9 @@ describe("grouped chat rendering", () => {
       1,
     );
     expect(resolveArtifactDownload).toHaveBeenCalledTimes(2);
+    expect(revokeObjectURL).not.toHaveBeenCalledWith("blob:download");
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:download");
     container.remove();
   });
 
@@ -2646,7 +2677,7 @@ describe("grouped chat rendering", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, fetchInit] = requireFetchCallForUrl(
       fetchMock,
-      `${managedChatImageUrl.replace(/\/full$/u, "/thumbnail")}?v=2`,
+      `${managedChatImageUrl.replace(/\/full$/u, "/thumbnail")}?v=4&width=480`,
     );
     expect(fetchInit?.signal?.aborted).toBe(false);
     expectSameOriginGet(fetchInit);
@@ -2674,7 +2705,10 @@ describe("grouped chat rendering", () => {
       | undefined;
     const response = { ok: true, blob: async () => new Blob(["png"], { type: "image/png" }) };
     const fetchMock = vi.fn((url: string) => {
-      if (deferEvictedRefetch && url === `${imageUrls[1]?.replace(/\/full$/u, "/thumbnail")}?v=2`) {
+      if (
+        deferEvictedRefetch &&
+        url === `${imageUrls[1]?.replace(/\/full$/u, "/thumbnail")}?v=4&width=480`
+      ) {
         return new Promise<typeof response>((resolve) => {
           resolveEvictedRefetch = resolve;
         });
@@ -2844,10 +2878,12 @@ describe("grouped chat rendering", () => {
     let image = view.querySelector<HTMLImageElement>(".chat-message-image");
     expect(image).toBeInstanceOf(HTMLImageElement);
     image!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(onOpenImage).toHaveBeenCalledWith({
-      src: "https://example.com/cat.png",
-      title: "Image",
-    });
+    expect(onOpenImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        src: "https://example.com/cat.png",
+        title: "Image",
+      }),
+    );
 
     onOpenImage.mockClear();
     renderAssistantImage("javascript:alert(1)");

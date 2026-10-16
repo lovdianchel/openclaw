@@ -1,6 +1,7 @@
 import { extractSqliteTableSchema } from "../infra/sqlite-schema-sql.js";
 import {
   AGENT_JSON_PREDICATE_SCHEMA_VERSION,
+  AGENT_OUTBOX_SEQUENCE_SCHEMA_VERSION,
   AGENT_STORAGE_SCHEMA_VERSION,
   CANONICAL_SESSION_VALIDATION_SCHEMA_VERSION,
   CANONICAL_SESSION_WRITER_VALIDATION_SCHEMA_VERSION,
@@ -264,12 +265,24 @@ CREATE TABLE state_leases (
 ) STRICT;
 `;
 
+/** Historical admission and migration witnesses retain the pre-sequence contract. */
+export function withoutOutboxEnqueueSequence(schema: string): string {
+  return schema.replace(
+    "  enqueue_sequence INTEGER PRIMARY KEY,\n  advancement_key TEXT NOT NULL UNIQUE,",
+    "  advancement_key TEXT NOT NULL PRIMARY KEY,",
+  );
+}
+
 /** Compare historical migration targets against only the representation they support. */
 export function getOpenClawAgentMigrationSchema(targetVersion: number): string {
+  const sequenceSchemaSql =
+    targetVersion < AGENT_OUTBOX_SEQUENCE_SCHEMA_VERSION
+      ? withoutOutboxEnqueueSequence(OPENCLAW_AGENT_SCHEMA_SQL)
+      : OPENCLAW_AGENT_SCHEMA_SQL;
   const predicateSchemaSql =
     targetVersion < AGENT_JSON_PREDICATE_SCHEMA_VERSION
-      ? withoutAgentJsonPredicateColumns(OPENCLAW_AGENT_SCHEMA_SQL)
-      : OPENCLAW_AGENT_SCHEMA_SQL;
+      ? withoutAgentJsonPredicateColumns(sequenceSchemaSql)
+      : sequenceSchemaSql;
   const canonicalSchemaSql =
     targetVersion < CANONICAL_SESSION_WRITER_VALIDATION_SCHEMA_VERSION
       ? withLegacyCanonicalSessionValidationTriggers(predicateSchemaSql)
@@ -341,7 +354,9 @@ export const AGENT_V14_CORE_SCHEMA_SQL = withLegacySessionParticipantsSchema(
   withLegacyAgentStorageSchema(
     withLegacyCanonicalSessionValidationTriggers(
       withoutAgentJsonPredicateColumns(
-        AGENT_SCHEMA_WITHOUT_PROGRESS_CARD_SQL.replace(sessionSharingSchema, ""),
+        withoutOutboxEnqueueSequence(
+          AGENT_SCHEMA_WITHOUT_PROGRESS_CARD_SQL.replace(sessionSharingSchema, ""),
+        ),
       ),
     ),
   ),

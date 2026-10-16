@@ -81,7 +81,7 @@ export function sqliteSchemaContractFromCatalog(
 }
 
 type CatalogObject = SqliteSchemaRow & { type: string; tbl_name: string };
-type IndexRow = SqliteIndexListRow & { table_name: string; index_seq: number; sql: string | null };
+type IndexRow = SqliteIndexListRow & { table_name: string; index_seq: number };
 type IndexTermRow = SqliteIndexTermRow & { table_name: string; index_seq: number };
 type ColumnRow = SqliteColumnCatalog & { table_name: string };
 type ForeignKeyRow = SqliteForeignKeyCatalog & { table_name: string };
@@ -132,10 +132,9 @@ export function readSqliteSchemaCatalog(
         database
           .prepare(`
           SELECT t.name AS table_name, i.seq AS index_seq,
-            i.name, i.origin, i.partial, i."unique", d.sql
+            i.name, i.origin, i.partial, i."unique"
           FROM main.sqlite_schema AS t
           CROSS JOIN pragma_index_list(t.name, 'main') AS i
-          LEFT JOIN main.sqlite_schema AS d ON d.type = 'index' AND d.name = i.name
           WHERE t.type = 'table' AND substr(t.name, 1, 7) <> 'sqlite_'
         `)
           .all() as IndexRow[],

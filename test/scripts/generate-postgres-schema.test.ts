@@ -5,10 +5,12 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   generatePostgresSchemas,
+  generateLogbookPostgresSchema,
   generateWorkboardPostgresSchema,
   pendingPromotion,
 } from "../../scripts/generate-postgres-schema.mts";
 import { catalog as readCatalog, portTables } from "../../scripts/lib/postgres-schema-catalog.mts";
+import { generateSqliteSchemaCatalogs } from "../../scripts/lib/sqlite-schema-generation.mts";
 import { listOpenClawStateFeatureSchemas } from "../../src/state/openclaw-state-feature-schema.js";
 import { useAutoCleanupTempDirTracker } from "../helpers/temp-dir.js";
 
@@ -128,6 +130,29 @@ describe("PostgreSQL schema generation", () => {
     expect(postData).toContain('ALTER TABLE "workboard_card_labels" ADD FOREIGN KEY');
   });
 
+  it("keeps Logbook DDL and port allocation metadata current", async () => {
+    const { sql, portMetadata } = await generateLogbookPostgresSchema();
+    expect(sql).toBe(
+      fs.readFileSync(
+        path.join(root, "extensions/logbook/src/logbook-schema.postgres.sql"),
+        "utf8",
+      ),
+    );
+    expect(portMetadata).toEqual(
+      JSON.parse(
+        fs.readFileSync(
+          path.join(root, "src/infra/database-engine/logbook-port.generated.json"),
+          "utf8",
+        ),
+      ),
+    );
+    expect(portMetadata.tables.flatMap((table) => table.identities)).toEqual(
+      Array.from({ length: 4 }, () => ({ column: "id", autoIncrement: true })),
+    );
+    expect(sql).not.toContain("sqlite_sequence");
+    expect(sql).not.toMatch(/\b(?:BEGIN|COMMIT|CREATE SCHEMA)\b/);
+  });
+
   it("derives identity allocation semantics and composite keys from canonical SQLite", () => {
     const db = new DatabaseSync(":memory:");
     try {
@@ -151,6 +176,7 @@ describe("PostgreSQL schema generation", () => {
     const { files, report } = await generatePostgresSchemas(root);
     for (const file of [
       "state.postgres.sql",
+      "state-v23-v24.postgres.sql",
       "agent.postgres.sql",
       ...report.fragments.map((item) => item.file),
     ]) {
@@ -177,10 +203,13 @@ describe("PostgreSQL schema generation", () => {
         "manifest.json",
         "portability-report.md",
         "state.postgres.sql",
+        "state-v23-v24.postgres.sql",
         "runtime.ts",
         "sqlite-catalogs.ts",
         "sqlite-state-catalogs.ts",
+        "sqlite-state-catalogs.json",
         "sqlite-agent-catalogs.ts",
+        "sqlite-agent-catalogs.json",
       ].toSorted(),
     );
     expect(
@@ -286,6 +315,30 @@ describe("PostgreSQL schema generation", () => {
         db.close();
       }
     }
+  });
+
+  it("generates computed fragments after their owner prepares native SQLite capabilities", async () => {
+    const fragments = [3, 8].map((dimensions) => ({
+      id: `memory-vector-${dimensions}`,
+      store: "memory",
+      sql: `CREATE TABLE memory_vector_${dimensions} (embedding BLOB CHECK (length(embedding) = vector_dimensions())) STRICT;`,
+      prepare: (db: DatabaseSync) => {
+        db.function("vector_dimensions", { deterministic: true }, () => dimensions);
+      },
+    }));
+    const first = fragments[0]!;
+    await expect(
+      generateSqliteSchemaCatalogs([{ id: first.id, store: first.store, sql: first.sql }], root),
+    ).rejects.toMatchObject({ cause: { message: expect.stringContaining("no such function") } });
+
+    const files = await generateSqliteSchemaCatalogs(fragments, root);
+    expect(JSON.parse(files["sqlite-memory-catalogs.json"]!)).toMatchObject({
+      tables: [3, 8].map((dimensions) => ({
+        name: `memory_vector_${dimensions}`,
+        sql: `CREATE TABLE memory_vector_${dimensions} (embedding BLOB CHECK (length(embedding) = vector_dimensions())) STRICT`,
+        columns: [{ name: "embedding", type: "BLOB" }],
+      })),
+    });
   });
 
   it("preserves mapped types, keys, defaults, index ordering, and foreign-key timing", async () => {

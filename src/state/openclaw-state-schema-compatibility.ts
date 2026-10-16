@@ -1,5 +1,5 @@
 import {
-  getCanonicalSqliteNamedIndexContracts,
+  getCanonicalSqliteNamedIndexNames,
   type SqliteSchemaCompatibility,
   type SqliteSchemaIssue,
 } from "../infra/sqlite-schema-contract.js";
@@ -44,14 +44,13 @@ const CLAW_STARTUP_ADDITIVE_STATE_TABLE_SET = new Set<string>(CLAW_STARTUP_ADDIT
 const CLAW_READONLY_OPTIONAL_STATE_INDEXES = [
   "idx_meeting_transcript_utterances_id",
   "idx_operator_approvals_source_run_resolved",
-  "idx_task_runs_requester_session_key",
   "idx_worker_session_placements_environment",
 ] as const;
 let openClawStateCanonicalNamedIndexSet: ReadonlySet<string> | undefined;
 
 function getOpenClawStateCanonicalNamedIndexSet(): ReadonlySet<string> {
   openClawStateCanonicalNamedIndexSet ??= new Set(
-    getCanonicalSqliteNamedIndexContracts(OPENCLAW_STATE_SCHEMA_SQL).map((index) => index.name),
+    getCanonicalSqliteNamedIndexNames(OPENCLAW_STATE_SCHEMA_SQL),
   );
   return openClawStateCanonicalNamedIndexSet;
 }
