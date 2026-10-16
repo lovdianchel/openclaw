@@ -303,7 +303,6 @@ export function defineSolidBridge<Props extends object, Methods extends object =
         return this.#application
           ? createComponent(ApplicationProvider, {
               value: this.#application,
-              host: this,
               get children() {
                 return contentView();
               },
