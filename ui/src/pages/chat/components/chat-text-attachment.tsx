@@ -1,4 +1,4 @@
-import type { JSX } from "@solidjs/web";
+import type { JSX as SolidJSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, onCleanup, onSettled, Show } from "solid-js";
 import { LazyCustomElementRequestController } from "../../../app/lazy-custom-element.ts";
 import { MarkdownBlocks } from "../../../components/markdown-blocks-owner.ts";
@@ -65,7 +65,7 @@ function MarkdownAttachment(props: { text: string; label: string }) {
 
 type TextAttachmentProps = {
   plainText: boolean;
-  actions: JSX.Element;
+  actions: SolidJSX.Element;
   embedSandboxMode: EmbedSandboxMode;
   src: string;
   sourceIdentity: string;
