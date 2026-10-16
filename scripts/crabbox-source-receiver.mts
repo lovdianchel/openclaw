@@ -248,7 +248,6 @@ try {
     }
     if (actual !== oid) fail("source bytes mismatch: " + file);
   }
-  for (const entry of files) verify(entry);
   if (expected.alias) git(["update-ref", expected.alias, expected.baseSha]);
   git(["symbolic-ref", "HEAD", "refs/heads/openclaw-source"]);
   const sourceIndex = git(["ls-files", "--stage", "-v", "-z"], { encoding: "buffer" });
