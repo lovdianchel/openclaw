@@ -24,8 +24,8 @@ export function createApplicationContextProvider(context: ApplicationContext) {
     document.createDocumentFragment(),
   );
   return Object.assign(host, {
-    setContext: (context: ApplicationContext) => {
-      setValue(normalizeApplicationContext(context));
+    setContext: (next: ApplicationContext) => {
+      setValue(normalizeApplicationContext(next));
       flush();
     },
   });

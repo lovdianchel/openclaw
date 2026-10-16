@@ -2,8 +2,7 @@
 
 import { createRouter, definePage } from "@openclaw/uirouter";
 import { render } from "@solidjs/testing-library";
-import { flush } from "solid-js";
-import { createComponent } from "solid-js";
+import { createComponent, flush } from "solid-js";
 import { expect, it, onTestFinished, vi } from "vitest";
 import type { ControlUiHost, ControlUiReplacement } from "../../../src/plugin-sdk/control-ui.js";
 import { GatewayBrowserClient } from "../api/gateway.ts";
