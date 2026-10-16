@@ -13,12 +13,12 @@ import {
 import { subscribeTranscriptScroll } from "./components/chat-transcript-scroll-events.ts";
 import {
   installTranscriptDomMocks,
-  mountTestTranscript,
   resetTranscriptTestDom,
   resizeObservers,
   transcriptDomState,
   type TestContentRow,
 } from "./components/chat-transcript.test-support.ts";
+import { mountTestTranscript } from "./test-helpers/chat-transcript-native.tsx";
 
 beforeEach(installTranscriptDomMocks);
 afterEach(() => {
@@ -61,7 +61,7 @@ it.each(["idle measurement", "end-command measurement", "native end clamp"] as c
     const rows: TestContentRow[] = Array.from({ length: 12 }, (_, index) => ({
       kind: "content",
       key: `row:${index}`,
-      content: Object.assign(document.createElement("div"), { textContent: `Message ${index}` }),
+      content: <div>Message {index}</div>,
     }));
     const mounting = mountTestTranscript("maintenance-history", rows, props.transcript);
     await vi.advanceTimersByTimeAsync(0);

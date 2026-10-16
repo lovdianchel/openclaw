@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { page } from "vitest/browser";
-import { saveChatSessionScrollPosition } from "../scroll.ts";
 import "../../../styles.css";
 import "../../../styles/chat.ts";
+import { saveChatSessionScrollPosition } from "../scroll.ts";
 import { TranscriptTestHost } from "../test-helpers/chat-transcript-native.tsx";
 import { ChatTranscriptController } from "./chat-transcript-controller.ts";
 import type { TranscriptRow } from "./chat-transcript-layout.ts";
@@ -20,12 +20,12 @@ class EndFollowFixture extends TranscriptTestHost {
 
   private readonly viewport = document.createElement("div");
   private readonly thread = document.createElement("div");
-  private readonly dock = document.createElement("div");
   private readonly earlier = document.createElement("div");
   private readonly last = document.createElement("div");
-  private readonly contents = document.createElement("div");
-  private renderedEarlierRowHeight: number | undefined;
-  private renderedLastRowHeight: number | undefined;
+  private readonly dock = document.createElement("div");
+  private readonly content = [this.viewport, this.dock];
+  private appliedEarlierRowHeight: number | undefined;
+  private appliedLastRowHeight: number | undefined;
 
   constructor() {
     super();
@@ -33,24 +33,23 @@ class EndFollowFixture extends TranscriptTestHost {
     this.thread.className = "chat-thread";
     this.thread.style.overflowAnchor = "none";
     this.viewport.append(this.thread);
+    this.earlier.textContent = "Earlier";
+    this.last.textContent = "Growing run";
     this.dock.className = "chat-prs";
     this.dock.style.cssText = "position: relative; height: 38px; margin-top: -38px";
     this.dock.textContent = "Pull request";
-    this.earlier.textContent = "Earlier";
-    this.last.textContent = "Growing run";
-    this.contents.append(this.viewport, this.dock);
   }
 
   override renderTranscript = () => {
     this.viewport.style.cssText = `height: ${this.viewportHeight}px; flex: none; padding: 0 0 ${this.viewportPadding}px`;
-    // Preserve intrinsic DOM growth when a measurement requests another commit.
-    if (this.renderedEarlierRowHeight !== this.earlierRowHeight) {
+    // Preserve intrinsic DOM growth when only the controller requests a render.
+    if (this.appliedEarlierRowHeight !== this.earlierRowHeight) {
       this.earlier.style.height = `${this.earlierRowHeight}px`;
-      this.renderedEarlierRowHeight = this.earlierRowHeight;
+      this.appliedEarlierRowHeight = this.earlierRowHeight;
     }
-    if (this.renderedLastRowHeight !== this.lastRowHeight) {
+    if (this.appliedLastRowHeight !== this.lastRowHeight) {
       this.last.style.height = `${this.lastRowHeight}px`;
-      this.renderedLastRowHeight = this.lastRowHeight;
+      this.appliedLastRowHeight = this.lastRowHeight;
     }
     const rows: TranscriptRow[] = [
       { kind: "content", key: "earlier", content: this.earlier },
@@ -65,10 +64,10 @@ class EndFollowFixture extends TranscriptTestHost {
         false,
       );
     });
-    if (this.thread.firstChild !== content) {
+    if (content.parentElement !== this.thread) {
       this.thread.replaceChildren(content);
     }
-    return this.contents;
+    return this.content;
   };
 }
 customElements.define("test-transcript-end-follow", EndFollowFixture);

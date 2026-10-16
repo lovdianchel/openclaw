@@ -29,30 +29,15 @@ function createFocusedPane() {
 
 describe("chat pane keyboard focus", () => {
   it.each([
-    [
-      "range",
-      "Home",
-      () => Object.assign(document.createElement("input"), { type: "range" }),
-      false,
-    ],
-    ["input", "ArrowUp", () => document.createElement("input"), false],
+    ["range", "Home", () => <input type="range" />, false],
+    ["input", "ArrowUp", () => <input />, false],
     [
       "handled widget",
       "PageUp",
-      () => {
-        const widget = document.createElement("div");
-        widget.textContent = "Widget";
-        widget.addEventListener("keydown", (event) => event.preventDefault());
-        return widget;
-      },
+      () => <div onKeyDown={(event: KeyboardEvent) => event.preventDefault()}>Widget</div>,
       false,
     ],
-    [
-      "transcript",
-      "Home",
-      () => Object.assign(document.createElement("span"), { textContent: "History" }),
-      true,
-    ],
+    ["transcript", "Home", () => <span>History</span>, true],
     ...nativeControlNavigationCases
       .filter((testCase) => {
         const [name, key] = testCase;
@@ -87,10 +72,10 @@ describe("chat pane keyboard focus", () => {
       state.chatHistoryPagination = { hasMore: true, nextOffset: 2 };
       pane.historyAutoLoadBlocked = true;
       vi.stubGlobal("IntersectionObserver", undefined);
-      const thread = document.createElement("div");
-      // Run with the native root currentTarget before Solid's delegate retargets it.
-      thread.addEventListener("keydown", (event) => pane.handleTranscriptHistoryIntent(event));
-      mountSolid(content, { container: thread });
+      const { container } = mountSolid(() => (
+        <div onKeyDown={(event) => pane.handleTranscriptHistoryIntent(event)}>{content()}</div>
+      ));
+      const thread = container.firstElementChild!;
       const restorePlatform = configureNativeKeyTarget(thread.firstElementChild!, fixture);
       try {
         thread.firstElementChild!.dispatchEvent(

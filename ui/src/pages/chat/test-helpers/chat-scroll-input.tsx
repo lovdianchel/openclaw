@@ -18,7 +18,7 @@ type NativeKeyCase = readonly [
 
 const controls = [
   ["input", () => <input value="Several words to edit" />],
-  ["textarea", () => <textarea value="Several words to edit" />],
+  ["textarea", () => <textarea>Several words to edit</textarea>],
   [
     "editable",
     () => (

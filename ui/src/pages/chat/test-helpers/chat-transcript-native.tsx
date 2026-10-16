@@ -1,6 +1,6 @@
 import { expectDefined } from "@openclaw/normalization-core";
 import type { JSX } from "@solidjs/web";
-import { createSignal, Show } from "solid-js";
+import { createMemo, createSignal, Show } from "solid-js";
 import { vi } from "vitest";
 import type { SolidController, SolidControllerHost } from "../../../lit/solid-controller-host.ts";
 import { mountSolid } from "../../../test-helpers/mount-solid.ts";
@@ -13,52 +13,26 @@ import {
 } from "../components/chat-thread-interactions.ts";
 import { ChatThread } from "../components/chat-thread-view.tsx";
 import type { ChatTranscriptController } from "../components/chat-transcript-controller.ts";
-import type { TranscriptRow } from "../components/chat-transcript-layout.ts";
 import { TranscriptSearch } from "../components/chat-transcript-search.tsx";
 import type { ChatTranscriptSession } from "../components/chat-transcript-session.ts";
-
-export type TestContentRow = Extract<TranscriptRow, { kind: "content" }>;
-
-export async function flushDeferredRowPrune(): Promise<void> {
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-}
+import {
+  flushDeferredRowPrune,
+  type TestContentRow,
+} from "../components/chat-transcript.test-support.ts";
 
 class ThreadFixture {
   constructor(
     readonly props: ChatThreadProps,
     readonly transcript: ChatTranscriptController,
+    readonly search?: () => void,
   ) {}
 }
 
 class SearchFixture {
-  readonly state;
-  readonly onClose;
   constructor(
-    paneId: string,
+    readonly paneId: string,
     readonly requestUpdate: () => void,
-  ) {
-    const state = getTranscriptState(paneId);
-    this.state = {
-      get searchOpen() {
-        return state.searchOpen;
-      },
-      get searchQuery() {
-        return state.searchQuery;
-      },
-      set searchQuery(value: string) {
-        state.searchQuery = value;
-      },
-      get searchFocusPending() {
-        return state.searchFocusPending;
-      },
-      set searchFocusPending(value: boolean) {
-        state.searchFocusPending = value;
-      },
-    };
-    this.onClose = () => closeTranscriptSearch(state, requestUpdate);
-  }
+  ) {}
 }
 
 type NativeContent = JSX.Element | ThreadFixture | SearchFixture;
@@ -66,20 +40,31 @@ const mounts = new WeakMap<HTMLElement, { update(value: NativeContent): void; un
 
 function Content(props: { value: NativeContent }) {
   const thread = () => (props.value instanceof ThreadFixture ? props.value : undefined);
-  const search = () => (props.value instanceof SearchFixture ? props.value : undefined);
+  const search = createMemo(() => {
+    const value = props.value;
+    if (value instanceof SearchFixture) {
+      return value;
+    }
+    if (value instanceof ThreadFixture && value.search) {
+      return new SearchFixture(value.props.paneId, value.search);
+    }
+    return undefined;
+  });
   return (
     <>
-      <Show when={thread()}>
-        {(value) => <ChatThread props={value().props} transcript={value().transcript} />}
-      </Show>
       <Show when={search()}>
         {(value) => (
           <TranscriptSearch
-            state={value().state}
+            state={getTranscriptState(value().paneId)}
             requestUpdate={value().requestUpdate}
-            onClose={value().onClose}
+            onClose={() =>
+              closeTranscriptSearch(getTranscriptState(value().paneId), value().requestUpdate)
+            }
           />
         )}
+      </Show>
+      <Show when={thread()}>
+        {(value) => <ChatThread props={value().props} transcript={value().transcript} />}
       </Show>
       {props.value instanceof ThreadFixture || props.value instanceof SearchFixture
         ? undefined
@@ -88,8 +73,12 @@ function Content(props: { value: NativeContent }) {
   );
 }
 
-export function renderChatThread(props: ChatThreadProps, transcript: ChatTranscriptController) {
-  return new ThreadFixture(props, transcript);
+export function renderChatThread(
+  props: ChatThreadProps,
+  transcript: ChatTranscriptController,
+  options?: { search: () => void },
+) {
+  return new ThreadFixture(props, transcript, options?.search);
 }
 
 export function renderTranscriptSearch(paneId: string, requestUpdate: () => void) {
@@ -123,7 +112,7 @@ export function render(value: NativeContent, container: HTMLElement): void {
 
 export class TranscriptTestHost extends HTMLElement implements SolidControllerHost {
   readonly transcriptRoot = document.createElement("div");
-  renderTranscript: () => JSX.Element = () => null;
+  renderTranscript: () => NativeContent = () => null;
   committedRenders = 0;
   private readonly controllers = new Set<SolidController>();
   private pending: Promise<boolean> | undefined;
@@ -150,7 +139,11 @@ export class TranscriptTestHost extends HTMLElement implements SolidControllerHo
     for (const controller of this.controllers) {
       controller.hostDisconnected?.();
     }
-    render(null, this.transcriptRoot);
+    queueMicrotask(() => {
+      if (!this.isConnected) {
+        render(null, this.transcriptRoot);
+      }
+    });
   }
 
   requestUpdate() {

@@ -2,6 +2,7 @@ import { expectDefined } from "@openclaw/normalization-core";
 import { vi } from "vitest";
 import { resetChatThreadState } from "../chat-thread.ts";
 import { resetThreadPresentation, type ChatThreadProps } from "./chat-thread-interactions.ts";
+import type { TranscriptRow } from "./chat-transcript-layout.ts";
 
 export const observedElements = new Set<Element>();
 export const resizeObservers = new Set<RecordingResizeObserver>();
@@ -106,6 +107,12 @@ export function transcriptSize(container: ParentNode): number {
   return Number.parseFloat(extent.style.height);
 }
 
+export async function flushDeferredRowPrune(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 export function installTranscriptDomMocks(): void {
   observedElements.clear();
   resizeObservers.clear();
@@ -140,8 +147,4 @@ export function resetTranscriptTestDom(): void {
   document.body.replaceChildren();
 }
 
-export {
-  flushDeferredRowPrune,
-  mountTestTranscript,
-  type TestContentRow,
-} from "../test-helpers/chat-transcript-native.tsx";
+export type TestContentRow = Extract<TranscriptRow, { kind: "content" }>;

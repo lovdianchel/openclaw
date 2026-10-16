@@ -4,8 +4,9 @@ import { createDeferred } from "../../../../test/helpers/promise.js";
 import type { GatewaySessionRow, ModelCatalogResult } from "../../api/types.ts";
 import { disposeQuestionPromptState } from "../../app/question-prompt.ts";
 import { buildCatalogSessionKey } from "../../lib/sessions/catalog-key.ts";
+import { emptyLegacyContent } from "../../lit/solid-content.tsx";
 import { sessionMutationGatewayHello } from "../../test-helpers/gateway-methods.ts";
-import { flush, waitForSolid } from "../../test-helpers/solid-settle.ts";
+import { waitForSolid } from "../../test-helpers/solid-settle.ts";
 import {
   createComposerContainer,
   disposeComposer,
@@ -81,7 +82,7 @@ class SuggestionRecoveryPane extends ChatPaneRuntime {
 
   protected override renderChatPaneLayout({ chatProps }: { chatProps: ChatProps }) {
     this.chatProps = chatProps;
-    return null;
+    return emptyLegacyContent;
   }
 }
 
@@ -565,7 +566,7 @@ describe("subagent composer", () => {
     "keeps copy but not Reply when $name replaces the composer",
     ({ key, ...scenario }) => {
       installTranscriptDomMocks();
-      const { pane, state } = createRefreshChatPane();
+      const { pane, state, context } = createRefreshChatPane();
       state.sessionKey = key;
       state.sessionsResult = {
         ts: 1,
@@ -586,17 +587,13 @@ describe("subagent composer", () => {
       const container = document.body.appendChild(createComposerContainer());
       try {
         pane.render();
-        renderChatPropsInto(container, pane.chatProps!);
-        pane.chatProps!.transcript.hostConnected();
-        pane.chatProps!.transcript.hostUpdated();
-        flush();
+        renderChatPropsInto(container, pane.chatProps!, context);
         expect(container.textContent).toContain("The workspace review is complete.");
         expect(container.querySelector("textarea")).toBeNull();
         expect(container.querySelector(".chat-reply-btn")).toBeNull();
         expect(container.querySelector(".chat-copy-btn")).not.toBeNull();
       } finally {
         disposeChatView(container);
-        pane.chatProps?.transcript.hostDisconnected();
         resetTranscriptTestDom();
       }
     },
@@ -668,7 +665,7 @@ describe("subagent composer", () => {
     "keeps an ordinary nested session reply editable while connected=%s",
     (connected) => {
       installTranscriptDomMocks();
-      const { pane, state } = createRefreshChatPane(
+      const { pane, state, context } = createRefreshChatPane(
         connected ? createGatewayBrowserClientFixture() : undefined,
       );
       state.sessionKey = "agent:main:fork";
@@ -693,7 +690,7 @@ describe("subagent composer", () => {
       const container = document.body.appendChild(createComposerContainer());
       const draw = () => {
         pane.render();
-        renderChatPropsInto(container, pane.chatProps!);
+        renderChatPropsInto(container, pane.chatProps!, context);
       };
       try {
         draw();
@@ -711,7 +708,6 @@ describe("subagent composer", () => {
         );
       } finally {
         disposeChatView(container);
-        pane.chatProps?.transcript.hostDisconnected();
         resetTranscriptTestDom();
       }
     },

@@ -1,23 +1,29 @@
 /* @vitest-environment jsdom */
+// Contract for full-message eligibility: the Gateway marks every display-
+// capped projection; pending inputs share assistant expansion without gaining
+// transcript mutation actions.
+import { For } from "solid-js";
 import { describe, expect, it, vi } from "vitest";
 import { handleMarkdownCodeBlockClick } from "../../../components/markdown-code-blocks.ts";
 import { markdownBlocksRef } from "../../../components/markdown-element-refs-solid.ts";
 import { resolveMessageDisplayMarkdown } from "../../../lib/chat/message-display.ts";
 import { extractText } from "../../../lib/chat/message-extract.ts";
 import { normalizeMessage } from "../../../lib/chat/message-normalizer.ts";
+import { SolidContentPresentation } from "../../../lit/solid-content.tsx";
 import { renderSolidRef } from "../../../test-helpers/render-solid-ref.ts";
-import { flush } from "../../../test-helpers/solid-settle.ts";
+import { mountSolid } from "../../../test-helpers/solid-render.tsx";
 import { persistedMessageEntryId } from "../chat-thread-items.ts";
+import { GroupedMessage } from "./chat-message-bubble-view.tsx";
 import { prepareChatMessageRender, resolveMessageActionDetails } from "./chat-message-markdown.ts";
-// Contract for full-message eligibility: the Gateway marks every display-
-// capped projection; pending inputs share assistant expansion without gaining
-// transcript mutation actions.
-import {
-  render,
-  renderGroupedMessage,
-  renderMessageMarkdown,
-  renderMarkdownSection,
-} from "./chat-message-native.test-support.tsx";
+import { MessageMarkdown, type MessageMarkdownProps } from "./chat-message-text-view.tsx";
+
+function MessageSection(props: MessageMarkdownProps) {
+  return (
+    <section onClick={handleMarkdownCodeBlockClick}>
+      <MessageMarkdown {...props} />
+    </section>
+  );
+}
 
 const cappedMeta = { id: "msg-1", truncated: true, reason: "display-cap" };
 
@@ -141,29 +147,44 @@ describe("user message disclosure", () => {
     const container = document.body.appendChild(document.createElement("div"));
     const restoreStyles: Array<() => void> = [];
     const markdown = "A long prompt with unchanged layout. ".repeat(50);
-    const draw = (text = markdown, expanded = false) =>
-      render(
-        ["first", "second"].map((key) =>
-          renderMessageMarkdown(
-            text,
-            key,
-            {
-              role: "user",
-              isStreaming: false,
-              isUserMessageExpanded: () => expanded,
-              onToggleUserMessageExpanded: vi.fn(),
-            },
-            {},
-          ),
-        ),
-        container,
-      );
+    const view = mountSolid(
+      (props: { text: string; expanded: boolean; presented: boolean }) => (
+        <SolidContentPresentation value={() => props.presented}>
+          <For each={["first", "second"]}>
+            {(key) => (
+              <MessageMarkdown
+                markdown={props.text}
+                messageKey={key}
+                options={{
+                  role: "user",
+                  isStreaming: false,
+                  isUserMessageExpanded: () => props.expanded,
+                  onToggleUserMessageExpanded: vi.fn(),
+                }}
+                markdownOptions={{}}
+              />
+            )}
+          </For>
+        </SolidContentPresentation>
+      ),
+      { text: markdown, expanded: false, presented: true },
+      container,
+    );
+    let current = { text: markdown, expanded: false, presented: true };
+    const draw = (text = markdown, expanded = false) => {
+      current = { ...current, text, expanded };
+      view.update(current);
+    };
+    const present = (presented: boolean) => {
+      current = { ...current, presented };
+      view.update(current);
+    };
     const settle = async () => {
       await Promise.resolve();
       await Promise.resolve();
     };
     try {
-      const part = draw()!;
+      draw();
       const phases: string[] = [];
       const measure = vi.fn(() => {
         phases.push("read");
@@ -209,19 +230,17 @@ describe("user message disclosure", () => {
       expect(measure).toHaveBeenCalled();
 
       draw(`${markdown}Retired before measurement.`);
-      part.setConnected(false);
-      flush();
+      present(false);
       measure.mockClear();
       await settle();
       fonts.dispatchEvent(new Event("loadingdone"));
       await settle();
       expect(measure).not.toHaveBeenCalled();
-      part.setConnected(true);
-      flush();
+      present(true);
       await settle();
       expect(measure).toHaveBeenCalled();
     } finally {
-      render(null, container);
+      view.dispose();
       container.remove();
       restoreStyles.forEach((restore) => restore());
       vi.unstubAllGlobals();
@@ -239,13 +258,14 @@ describe("user message disclosure", () => {
   ])("keeps $name fully visible", ({ markdown }) => {
     const container = document.createElement("div");
 
-    render(
-      renderMessageMarkdown(
+    mountSolid(
+      MessageMarkdown,
+      {
         markdown,
-        "message",
-        { role: "user", isStreaming: false, onToggleUserMessageExpanded: vi.fn() },
-        {},
-      ),
+        messageKey: "message",
+        options: { role: "user", isStreaming: false, onToggleUserMessageExpanded: vi.fn() },
+        markdownOptions: {},
+      },
       container,
     );
 
@@ -278,19 +298,23 @@ describe("streaming message Markdown", () => {
       "\n",
     );
     const prefix = `\`\`\`ts\n${code}\n\`\`\`\n\n`;
+    const view = mountSolid(
+      MessageSection,
+      {
+        markdown: prefix + "The answer",
+        messageKey: "retained-fence",
+        options: { role: "assistant", isStreaming: true },
+        markdownOptions: { codeBlockInteraction: "interactive", linkFavicons: false },
+      },
+      container,
+    );
     const renderTail = (text: string, streaming: boolean) =>
-      render(
-        renderMarkdownSection(
-          renderMessageMarkdown(
-            prefix + text,
-            "retained-fence",
-            { role: "assistant", isStreaming: streaming },
-            { codeBlockInteraction: "interactive", linkFavicons: !streaming },
-          ),
-          handleMarkdownCodeBlockClick,
-        ),
-        container,
-      );
+      view.update({
+        markdown: prefix + text,
+        messageKey: "retained-fence",
+        options: { role: "assistant", isStreaming: streaming },
+        markdownOptions: { codeBlockInteraction: "interactive", linkFavicons: !streaming },
+      });
     try {
       renderTail("The answer", true);
       await Promise.resolve();
@@ -317,7 +341,7 @@ describe("streaming message Markdown", () => {
         tail.split("\n\n").at(-1),
       );
     } finally {
-      render(null, container);
+      view.dispose();
       blocks.unmount();
       container.remove();
     }
@@ -334,19 +358,23 @@ describe("streaming message Markdown", () => {
       targetElement: container,
     });
     const source = "```ts\nconst original = 42;\n```\n\nSee [guide][ref]\n\nTail";
+    const view = mountSolid(
+      MessageSection,
+      {
+        markdown: source,
+        messageKey: "message",
+        options: { role: "assistant", isStreaming: true },
+        markdownOptions: { codeBlockInteraction: "interactive" },
+      },
+      container,
+    );
     const show = (markdown: string, key = "message", interactive = true) =>
-      render(
-        renderMarkdownSection(
-          renderMessageMarkdown(
-            markdown,
-            key,
-            { role: "assistant", isStreaming: true },
-            { codeBlockInteraction: interactive ? "interactive" : "static" },
-          ),
-          handleMarkdownCodeBlockClick,
-        ),
-        container,
-      );
+      view.update({
+        markdown,
+        messageKey: key,
+        options: { role: "assistant", isStreaming: true },
+        markdownOptions: { codeBlockInteraction: interactive ? "interactive" : "static" },
+      });
     try {
       show(source);
       await Promise.resolve();
@@ -375,7 +403,7 @@ describe("streaming message Markdown", () => {
       }
       expect(container.querySelectorAll("pre code")).toHaveLength(1);
     } finally {
-      render(null, container);
+      view.dispose();
       blocks.unmount();
       container.remove();
     }
@@ -387,14 +415,15 @@ describe("streaming message Markdown", () => {
     { markdown: "Intro\n\n```ts\nconst answer = 42;\n```", owner: ".chat-text" },
   ])("keeps the duplicate count on the terminal owner for $markdown", ({ markdown, owner }) => {
     const container = document.createElement("div");
-    render(
-      renderMessageMarkdown(
+    const view = mountSolid(
+      MessageMarkdown,
+      {
         markdown,
-        "streaming-duplicate",
-        { role: "assistant", isStreaming: true },
-        {},
-        { count: 3, label: "Three identical messages" },
-      ),
+        messageKey: "streaming-duplicate",
+        options: { role: "assistant", isStreaming: true },
+        markdownOptions: {},
+        duplicateSuffix: { count: 3, label: "Three identical messages" },
+      },
       container,
     );
 
@@ -402,16 +431,13 @@ describe("streaming message Markdown", () => {
     expect(container.querySelector(`${owner} > .chat-duplicate-count`)?.textContent).toBe("×3");
     expect(container.querySelector("code .chat-duplicate-count")).toBeNull();
 
-    render(
-      renderMessageMarkdown(
-        `${markdown}\n\nMore`,
-        "streaming-duplicate",
-        { role: "assistant", isStreaming: true },
-        {},
-        { count: 4, label: "Four identical messages" },
-      ),
-      container,
-    );
+    view.update({
+      markdown: `${markdown}\n\nMore`,
+      messageKey: "streaming-duplicate",
+      options: { role: "assistant", isStreaming: true },
+      markdownOptions: {},
+      duplicateSuffix: { count: 4, label: "Four identical messages" },
+    });
     expect(container.querySelectorAll(".chat-duplicate-count")).toHaveLength(1);
     expect(
       container.querySelector(".chat-text > p:last-child > .chat-duplicate-count")?.textContent,
@@ -427,7 +453,11 @@ describe("message Markdown source preservation", () => {
       const markdown = resolveMessageDisplayMarkdown(message, normalizeMessage(message));
       for (const isStreaming of [false, true]) {
         const container = document.createElement("div");
-        render(renderMessageMarkdown(markdown, "indent", { role, isStreaming }, {}), container);
+        mountSolid(
+          MessageMarkdown,
+          { markdown, messageKey: "indent", options: { role, isStreaming }, markdownOptions: {} },
+          container,
+        );
         expect(container.querySelector("pre code")?.textContent).toBe("*literal*\n");
         expect(container.querySelector("em")).toBeNull();
       }
@@ -479,20 +509,21 @@ describe("persisted human mentions in message bubbles", () => {
     },
   ])("attaches identities only to unchanged selected user spans: $name", (entry) => {
     const host = document.createElement("div");
-    render(
-      renderGroupedMessage(
-        prepareChatMessageRender({
+    mountSolid(
+      GroupedMessage,
+      {
+        preparation: prepareChatMessageRender({
           role: entry.role,
           content: entry.content,
           __openclaw: entry.metadata,
         }),
-        "message",
-        {
+        messageKey: "message",
+        options: {
           isStreaming: false,
           showReasoning: false,
           messageActions: entry.replacement ? { markdown: entry.replacement } : undefined,
         },
-      ),
+      },
       host,
     );
     const references = host.querySelectorAll("openclaw-person-reference");

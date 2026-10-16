@@ -1,9 +1,8 @@
 /* @vitest-environment jsdom */
 
-import { createComponent } from "solid-js";
 import { afterEach, describe, expect, it } from "vitest";
 import type { QuestionPrompt } from "../../app/question-prompt.ts";
-import { mountSolid } from "../../test-helpers/mount-solid.ts";
+import { mountSolid } from "../../test-helpers/solid-render.tsx";
 import { buildCachedChatItems, coalesceStreamRuns, resetChatThreadState } from "./chat-thread.ts";
 import { ChatQuestionSummary } from "./components/chat-question-summary.tsx";
 
@@ -93,7 +92,7 @@ describe("question chat items", () => {
     question.answers = { answers: { format: ["Compact"] } };
     const container = document.createElement("div");
 
-    mountSolid(() => createComponent(ChatQuestionSummary, { prompt: question }), { container });
+    mountSolid(ChatQuestionSummary, { prompt: question }, container);
     expect(
       container.querySelector(".chat-question-summary")?.textContent?.replace(/\s+/g, " "),
     ).toContain(`Which format? Format: ${outcome}`);
@@ -116,7 +115,7 @@ describe("question chat items", () => {
     answered.answers = { answers: { api_key: ["fake-secret-never-render"] } };
     const container = document.createElement("div");
 
-    mountSolid(() => createComponent(ChatQuestionSummary, { prompt: answered }), { container });
+    mountSolid(ChatQuestionSummary, { prompt: answered }, container);
 
     expect(container.textContent?.replace(/\s+/g, " ")).toContain("API key: Answered");
     expect(container.textContent).toContain("Provide the deployment API key");

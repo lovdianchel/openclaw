@@ -1,5 +1,7 @@
-import { expectDefined } from "@openclaw/normalization-core";
 /* @vitest-environment jsdom */
+
+import { expectDefined } from "@openclaw/normalization-core";
+import type { JSX } from "@solidjs/web";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeChatHost } from "../chat-host.test-support.ts";
 import { stubAnimationFrames } from "../chat-view.test-helpers.ts";
@@ -14,7 +16,7 @@ import {
   configureNativeKeyTarget,
   nativeControlNavigationCases,
 } from "../test-helpers/chat-scroll-input.tsx";
-import { render } from "../test-helpers/chat-transcript-native.tsx";
+import { mountTestTranscript, render } from "../test-helpers/chat-transcript-native.tsx";
 import { ChatTranscriptController } from "./chat-transcript-controller.ts";
 import { TranscriptEndAnchor } from "./chat-transcript-end-anchor.ts";
 import {
@@ -24,7 +26,6 @@ import {
 import { ChatSessionVirtualizerHost } from "./chat-transcript-virtualizer-host.ts";
 import {
   installTranscriptDomMocks,
-  mountTestTranscript,
   resetTranscriptTestDom,
   resizeObservers,
   transcriptDomState,
@@ -638,12 +639,12 @@ describe("chat transcript scroll ownership", () => {
   });
 
   it.each([
-    ["wheel", null, (): null => null, false],
-    ["downward wheel", null, (): null => null, false],
-    ["stationary wheel", null, (): null => null, false],
-    ["pointer", null, (): null => null, false],
-    ["latest", null, (): null => null, false],
-    ["automatic follow", null, (): null => null, true],
+    ["wheel", null, (): JSX.Element => null, false],
+    ["downward wheel", null, (): JSX.Element => null, false],
+    ["stationary wheel", null, (): JSX.Element => null, false],
+    ["pointer", null, (): JSX.Element => null, false],
+    ["latest", null, (): JSX.Element => null, false],
+    ["automatic follow", null, (): JSX.Element => null, true],
     ["text input", "ArrowUp", () => <input />, true],
     ["range input", "Home", () => <input type="range" />, true],
     ["range Space", " ", () => <input type="range" />, false],
@@ -675,13 +676,13 @@ describe("chat transcript scroll ownership", () => {
       "listbox",
       "PageUp",
       () => (
-        <select size="2">
+        <select size={2}>
           <option>One</option>
         </select>
       ),
       true,
     ],
-    ["textarea", " ", () => <textarea value="Text" />, true],
+    ["textarea", " ", () => <textarea>Text</textarea>, true],
     [
       "handled player",
       " ",

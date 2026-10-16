@@ -1,13 +1,11 @@
 /* @vitest-environment jsdom */
-import { createComponent, createSignal } from "solid-js";
+
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
-import { LitContent } from "../../../lit/solid-content.tsx";
-import { mountSolid } from "../../../test-helpers/mount-solid.ts";
 import { flush } from "../../../test-helpers/solid-settle.ts";
 import { persistedMessageEntryId } from "../chat-thread-items.ts";
 import { createTestTranscript } from "../chat-view.test-helpers.ts";
+import { render, renderChatThread } from "../test-helpers/chat-transcript-native.tsx";
 import { getTranscriptState, type ChatThreadProps } from "./chat-thread-interactions.ts";
-import { projectChatTranscript } from "./chat-transcript-projection.ts";
 import {
   installTranscriptDomMocks,
   resetTranscriptTestDom,
@@ -17,31 +15,19 @@ import {
 function voiceProjection(props: ChatThreadProps) {
   const controller = createTestTranscript(props.paneId);
   const container = document.body.appendChild(document.createElement("div"));
-  const [content, setContent] = createSignal<unknown>(null);
-  const view = mountSolid(
-    () =>
-      createComponent(LitContent, {
-        get value() {
-          return content();
-        },
-      }),
-    { container },
-  );
   onTestFinished(() => {
-    view.unmount();
+    render(null, container);
     controller.hostDisconnected();
   });
   return () => {
     controller.renderSession(props.sessionKey, (session) => {
       const renderRows = vi.spyOn(session, "render");
       try {
-        projectChatTranscript(props, session).renderRows();
-        expect(renderRows).toHaveBeenCalledOnce();
-        const voice = renderRows.mock.calls[0]![0].find(
-          (row) => row.kind === "content" && row.key === "realtime-talk",
-        );
-        setContent(() => (voice?.kind === "content" ? voice.content : null));
+        render(renderChatThread(props, controller), container);
+        controller.hostConnected();
+        controller.hostUpdated();
         flush();
+        expect(renderRows).toHaveBeenCalledOnce();
       } finally {
         renderRows.mockRestore();
       }

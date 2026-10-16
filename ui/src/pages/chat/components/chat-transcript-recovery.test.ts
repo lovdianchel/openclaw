@@ -4,12 +4,7 @@ import { expectDefined } from "@openclaw/normalization-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import { resetChatViewState } from "../chat-view-state.ts";
-import {
-  TranscriptTestHost,
-  render,
-  renderChatThread,
-  renderTranscriptSearch,
-} from "../test-helpers/chat-transcript-native.tsx";
+import { renderChatThread, TranscriptTestHost } from "../test-helpers/chat-transcript-native.tsx";
 import type { SidebarFullMessageLoader } from "./chat-sidebar-content-types.ts";
 import { toggleTranscriptSearch, type ChatThreadProps } from "./chat-thread-interactions.ts";
 import { ChatTranscriptController } from "./chat-transcript-controller.ts";
@@ -40,34 +35,17 @@ class RecoveryTranscriptElement extends TranscriptTestHost {
 
   override renderTranscript = () => {
     const requestUpdate = () => this.requestUpdate();
-    const search = this.contents.querySelector<HTMLElement>(".recovery-search");
-    const thread = this.contents.querySelector<HTMLElement>(".recovery-thread");
-    if (search && thread) {
-      render(renderTranscriptSearch(this.props.paneId, requestUpdate), search);
-      render(
-        renderChatThread({ ...this.props, onRequestUpdate: requestUpdate }, this.transcript),
-        thread,
-      );
-    }
-    return this.contents;
+    return renderChatThread({ ...this.props, onRequestUpdate: requestUpdate }, this.transcript, {
+      search: requestUpdate,
+    });
   };
-
-  private readonly contents = (() => {
-    const container = document.createElement("div");
-    const search = container.appendChild(document.createElement("div"));
-    search.className = "recovery-search";
-    const thread = container.appendChild(document.createElement("div"));
-    thread.className = "recovery-thread";
-    return container;
-  })();
 
   override disconnectedCallback() {
     // Match the pane-specific production reset before disconnecting controllers.
     if (this.resetPresentationOnDisconnect) {
       resetChatViewState(this.props.paneId);
     }
-    // Retain the native row roots so reconnection proves controller invalidation.
-    this.transcript.hostDisconnected();
+    super.disconnectedCallback();
   }
 }
 
@@ -191,7 +169,7 @@ describe("chat transcript full-message recovery", () => {
   });
 
   it.each(["loading", "loaded"] as const)(
-    "retires %s recovery when the same transcript controller reconnects",
+    "retires %s recovery when the same controller reconnects",
     async (phase) => {
       const retired = createDeferred<FullMessageResult>();
       const current = createDeferred<FullMessageResult>();

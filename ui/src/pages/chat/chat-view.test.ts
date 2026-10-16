@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { expectDefined } from "@openclaw/normalization-core";
-import { createComponent, createSignal, merge } from "solid-js";
+import { createComponent, createSignal } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { createDeferred } from "../../../../test/helpers/promise.js";
 import type { GatewayBrowserClient, GatewayHelloOk } from "../../api/gateway.ts";
@@ -33,6 +33,7 @@ import { createTestGatewayClient } from "../../test-helpers/gateway-client.ts";
 import { sessionMutationGatewayHello } from "../../test-helpers/gateway-methods.ts";
 import { mountSolid } from "../../test-helpers/mount-solid.ts";
 import { makeUiSettings } from "../../test-helpers/settings-node.ts";
+import { mountSolid as mountSolidComponent } from "../../test-helpers/solid-render.tsx";
 import { flush, waitForSolid } from "../../test-helpers/solid-settle.ts";
 import { waitForFast } from "../../test-helpers/wait-for.ts";
 import {
@@ -68,9 +69,9 @@ import {
   createReplyPane,
   createPasteEvent,
   createTestTranscript,
+  disposeChatView,
   renderChatInto,
   renderChatPropsInto,
-  disposeChatView,
   renderChatView,
   getComposerTextarea,
   requireElement,
@@ -535,35 +536,22 @@ function createChatModelControlsProps(state: ChatHeaderTestState): ChatModelCont
   };
 }
 
-const mountedModelControls = new WeakMap<HTMLElement, (props: ChatModelControlsProps) => void>();
+const modelControlsUpdates = new WeakMap<HTMLElement, (props: ChatModelControlsProps) => void>();
 
 function renderModelControls(
   state: ChatHeaderTestState,
   overrides: Partial<ChatModelControlsProps> = {},
   container = document.createElement("div"),
 ) {
-  const next = { ...createChatModelControlsProps(state), ...overrides };
-  const update = mountedModelControls.get(container);
+  const props = { ...createChatModelControlsProps(state), ...overrides };
+  const update = modelControlsUpdates.get(container);
   if (update) {
-    update(next);
+    update(props);
   } else {
-    const [props, setProps] = createSignal(next);
-    mountSolid(() => createComponent(ChatModelControls, merge(props)), { container });
-    mountedModelControls.set(container, setProps);
-    onTestFinished(() => {
-      mountedModelControls.delete(container);
-    });
+    const view = mountSolidComponent(ChatModelControls, props, container);
+    modelControlsUpdates.set(container, (next) => view.update(next));
   }
-  flush();
   return container;
-}
-
-function ModelControlFixture() {
-  return Object.assign(document.createElement("button"), {
-    className: "chat-composer-model-control",
-    type: "button",
-    textContent: "Model",
-  });
 }
 
 describe("chat typing status", () => {
@@ -1914,7 +1902,15 @@ describe("chat loading skeleton", () => {
   it("shows prompt-bar progress beside context usage while the current session send is awaiting acknowledgement", () => {
     const container = renderChatView({
       sending: true,
-      composerControls: solidContent(ModelControlFixture, {}),
+      composerControls: solidContent(
+        () =>
+          Object.assign(document.createElement("button"), {
+            className: "chat-composer-model-control",
+            type: "button",
+            textContent: "Model",
+          }),
+        {},
+      ),
       queue: [createPendingSend()],
       selectedSession: createContextUsageSessions().sessions[0],
     });
@@ -2047,7 +2043,15 @@ describe("chat loading skeleton", () => {
     try {
       const container = renderChatView({
         messages: [{ role: "assistant", content: "Partial response" }],
-        composerControls: solidContent(ModelControlFixture, {}),
+        composerControls: solidContent(
+          () =>
+            Object.assign(document.createElement("button"), {
+              className: "chat-composer-model-control",
+              type: "button",
+              textContent: "Model",
+            }),
+          {},
+        ),
         runStatus: {
           phase: "interrupted",
           runId: "run-1",
@@ -4935,7 +4939,8 @@ describe("right-click Reply", () => {
       let target: HTMLElement = bubble;
       if (mode === "linked image") {
         const preview = bubble.appendChild(document.createElement("div"));
-        const link = Object.assign(document.createElement("a"), { href: "https://example.com" });
+        const link = document.createElement("a");
+        link.href = "https://example.com";
         link.append(
           Object.assign(document.createElement("img"), { src: "/example.png", alt: "Example" }),
         );

@@ -1,5 +1,6 @@
-import { expectDefined } from "@openclaw/normalization-core";
 /* @vitest-environment jsdom */
+
+import { expectDefined } from "@openclaw/normalization-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestTranscript } from "../chat-view.test-helpers.ts";
 import {

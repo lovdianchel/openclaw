@@ -51,7 +51,7 @@ export function createApplicationContextProvider(context: ApplicationContext) {
     }
   });
   return Object.assign(host, {
-    setContext(value: ApplicationContext) {
+    setContext(this: void, value: ApplicationContext) {
       const next = normalizeApplicationContext(value);
       if (next === current) {
         return;

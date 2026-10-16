@@ -10,7 +10,7 @@ import {
   renderChatThread,
   renderTranscriptSearch,
 } from "../test-helpers/chat-transcript-native.tsx";
-import * as chatMessage from "./chat-message-group.test-support.ts";
+import * as chatMessage from "./chat-message-group-frame.ts";
 import { getTranscriptState, toggleTranscriptSearch } from "./chat-thread-interactions.ts";
 import {
   flushDeferredRowPrune,
@@ -590,6 +590,7 @@ describe("chat transcript replies", () => {
             ?.querySelector(".chat-reply-attribution--reply"),
           "reply attribution",
         );
+      const prepareFrame = vi.spyOn(chatMessage, "prepareMessageGroupFrame");
       try {
         rerender();
         transcript.hostConnected();
@@ -605,7 +606,8 @@ describe("chat transcript replies", () => {
             ?.getAttribute("data-chat-row-key"),
           "unrelated group key",
         );
-        const renderGroup = vi.spyOn(chatMessage, "renderMessageGroup");
+        expect(prepareFrame.mock.calls.some(([group]) => group.key === unrelatedKey)).toBe(true);
+        prepareFrame.mockClear();
 
         for (const [name, text] of [
           ["Carol", "Original question loaded"],
@@ -625,7 +627,7 @@ describe("chat transcript replies", () => {
           expect(
             attribution().querySelector("button .chat-reply-attribution__name")?.textContent,
           ).toBe(name);
-          expect(renderGroup.mock.calls.filter(([group]) => group.key === unrelatedKey)).toEqual(
+          expect(prepareFrame.mock.calls.filter(([group]) => group.key === unrelatedKey)).toEqual(
             [],
           );
         }

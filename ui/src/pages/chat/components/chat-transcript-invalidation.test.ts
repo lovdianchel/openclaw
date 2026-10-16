@@ -438,6 +438,7 @@ describe("chat transcript invalidation", () => {
         render(renderChatThread(props, transcript), container);
         transcript.hostUpdated();
       };
+      const prepareFrame = vi.spyOn(chatMessage, "prepareMessageGroupFrame");
       try {
         rerender();
         transcript.hostConnected();
@@ -454,7 +455,10 @@ describe("chat transcript invalidation", () => {
         expect(container.querySelector(".chat-bubble.streaming")?.textContent).toContain(
           props.stream,
         );
-        const prepareMessage = vi.spyOn(chatMessage, "prepareGroupMessage");
+        expect(prepareFrame.mock.calls.some(([group]) => group.runId === completedRunId)).toBe(
+          true,
+        );
+        prepareFrame.mockClear();
         if (update === "stream-only") {
           props.stream = "Advanced next reply";
         }
@@ -466,9 +470,9 @@ describe("chat transcript invalidation", () => {
         expect(container.querySelector('[data-entry-id="settled-final"]')).toBe(finalBubble);
         expect(finalBubble.textContent).toContain("Workspace checked");
         expect(workToggle.getAttribute("aria-expanded")).toBe("false");
-        expect(
-          prepareMessage.mock.calls.filter(([group]) => group.runId === completedRunId),
-        ).toEqual([]);
+        expect(prepareFrame.mock.calls.filter(([group]) => group.runId === completedRunId)).toEqual(
+          [],
+        );
       } finally {
         transcript.hostDisconnected();
       }
@@ -584,14 +588,16 @@ describe("chat transcript invalidation", () => {
     const transcript = createTestTranscript();
     const container = document.body.appendChild(document.createElement("div"));
     const rerender = () => render(renderChatThread(props, transcript), container);
+    const prepareFrame = vi.spyOn(chatMessage, "prepareMessageGroupFrame");
     rerender();
     const userRow = expectDefined(container.querySelector(".chat-group.user"), "user row");
     expect(userRow.querySelector(".chat-avatar")).toBeNull();
-    const prepareMessage = vi.spyOn(chatMessage, "prepareGroupMessage");
+    expect(prepareFrame.mock.calls.some(([group]) => group.role === "user")).toBe(true);
+    prepareFrame.mockClear();
 
     props.selectedSession = { ...props.selectedSession, updatedAt: 2, label: "Renamed chat" };
     rerender();
-    expect(prepareMessage).not.toHaveBeenCalled();
+    expect(prepareFrame).not.toHaveBeenCalled();
     expect(container.querySelector(".chat-group.user")).toBe(userRow);
 
     props.selectedSession = { ...props.selectedSession, kind: "group" };
