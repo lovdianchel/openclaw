@@ -7,7 +7,7 @@ import { availableLinkReaders } from "../../app/link-reader-routing.ts";
 import { isDesktopPanelAvailable } from "../../app/panel-availability.ts";
 import { currentThemeBranding } from "../../app/theme-branding.ts";
 import { renderAgentIdentityAvatar } from "../../components/identity-avatar-view.ts";
-import { renderSessionBackground } from "../../components/session-background-view.ts";
+import { renderSessionBackground } from "../../components/session-background-view.tsx";
 import { latestBrowserTabCards } from "../../lib/chat/browser-tab-preview.ts";
 import { storedChatOutboxScopeKey } from "../../lib/chat/outbox-store.ts";
 import { scopedAgentParamsForSession } from "../../lib/sessions/index.ts";
