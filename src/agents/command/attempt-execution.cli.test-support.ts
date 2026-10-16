@@ -19,6 +19,17 @@ import type { RunCliAgentParams } from "../cli-runner/types.js";
 import type { EmbeddedAgentRunResult } from "../embedded-agent.js";
 import type { ModelFallbackAttemptProvenance } from "../model-fallback.types.js";
 import type { runAgentAttempt } from "./attempt-execution.js";
+import { persistCliTurnTranscript } from "./transcript-persistence.js";
+
+export async function persistCliTranscriptEntry(
+  params: Parameters<typeof persistCliTurnTranscript>[0],
+): Promise<SessionEntry | undefined> {
+  const result = await persistCliTurnTranscript(params);
+  if (result.kind !== "persisted") {
+    throw new Error("expected CLI transcript persistence to keep the current session");
+  }
+  return result.sessionEntry;
+}
 
 export function resetCliAttemptFixtureDatabases(suiteRoot: string): void {
   for (const database of listOpenClawAgentDatabasesForTest()) {

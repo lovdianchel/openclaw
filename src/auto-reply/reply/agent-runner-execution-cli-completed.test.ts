@@ -252,10 +252,12 @@ it.each([
           if (accepted === "NO_REPLY") {
             expect(liveItems.get(`cli-thinking:${params.runId}`)).toBe("");
           }
+          const assistantReply = prepareCliAssistantReply(output);
           return buildCliRunResult({
             context,
             output,
-            assistantText: prepareCliAssistantReply(output).text,
+            assistantText: assistantReply.text,
+            terminalReplyText: assistantReply.terminalText,
             usedHistoryPrompt: false,
             userTurnHandled: true,
             sessionBindingDisabled: true,
@@ -358,10 +360,12 @@ it.each([
             rawOutput,
             context.backendResolved.textTransforms?.output,
           );
+          const assistantReply = prepareCliAssistantReply(output);
           return buildCliRunResult({
             context,
             output,
-            assistantText: prepareCliAssistantReply(output).text,
+            assistantText: assistantReply.text,
+            terminalReplyText: assistantReply.terminalText,
             usedHistoryPrompt: false,
             userTurnHandled: true,
             sessionBindingDisabled: true,

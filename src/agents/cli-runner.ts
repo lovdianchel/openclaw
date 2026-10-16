@@ -454,6 +454,7 @@ async function runPreparedCliAgentOwned(
     return {
       output,
       assistantText,
+      terminalReplyText: assistantReply.terminalText,
       terminalReplyKind: assistantReply.terminalReplyKind,
       lastAssistant,
       sourceReplyWasDelivered: sourceReplyMirror.delivered,
@@ -484,12 +485,13 @@ async function runPreparedCliAgentOwned(
           `CLI backend ${context.backendResolved.id} cannot ${params.controlOperation} without a reusable native session.`,
         );
       }
-      const { output, assistantText, terminalReplyKind, usedHistoryPrompt } =
+      const { output, assistantText, terminalReplyText, terminalReplyKind, usedHistoryPrompt } =
         await executeCliAttempt(reusableCliSessionId);
       return buildCliRunResult({
         ...resultContext,
         output,
         assistantText,
+        terminalReplyText,
         terminalReplyKind,
         ...(!isolatedCompletion ? { effectiveCliSessionId: reusableCliSessionId } : {}),
         bindingFlushOk: true,
@@ -529,6 +531,7 @@ async function runPreparedCliAgentOwned(
       const {
         output,
         assistantText,
+        terminalReplyText,
         terminalReplyKind,
         lastAssistant,
         sourceReplyWasDelivered,
@@ -565,6 +568,7 @@ async function runPreparedCliAgentOwned(
           ...resultContext,
           output,
           assistantText,
+          terminalReplyText,
           terminalReplyKind,
           effectiveCliSessionId,
           bindingFlushOk,

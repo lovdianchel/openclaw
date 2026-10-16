@@ -460,6 +460,7 @@ export function buildCliRunResult(params: {
   context: PreparedCliRunContext;
   output: CliOutput;
   assistantText: string;
+  terminalReplyText: string;
   terminalReplyKind?: EmbeddedAgentRunResult["meta"]["terminalReplyKind"];
   effectiveCliSessionId?: string;
   bindingFlushOk?: boolean;
@@ -478,6 +479,7 @@ export function buildCliRunResult(params: {
     effectiveCliSessionId,
     output,
     assistantText,
+    terminalReplyText,
     terminalReplyKind,
     preparedContextAgentMeta,
     sessionBindingDisabled,
@@ -620,7 +622,7 @@ export function buildCliRunResult(params: {
       terminalReply: sourceReplyMirror.delivered
         ? undefined
         : buildAgentRunTerminalReplySnapshot({
-            visibleText: assistantText,
+            visibleText: terminalReplyText,
             terminalReplyKind: settledReplyKind,
           }),
       // An empty final message is recorded as "" so capture never falls back to

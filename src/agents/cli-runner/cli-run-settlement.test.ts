@@ -141,6 +141,7 @@ describe("CLI native continuity projection", () => {
               context,
               output: { text: "done" },
               assistantText: "done",
+              terminalReplyText: "done",
               effectiveCliSessionId: kind === "native" ? "next-native-session" : undefined,
               bindingFlushOk: kind !== "no-native-id",
               usedHistoryPrompt: false,
@@ -215,6 +216,7 @@ describe.each(["anthropic", undefined])(
                     context,
                     output: { text: "done" },
                     assistantText: "done",
+                    terminalReplyText: "done",
                     effectiveCliSessionId: "next-native-session",
                     bindingFlushOk: true,
                     usedHistoryPrompt: false,
@@ -292,6 +294,7 @@ it("captures only the last CLI result as the model's final message", async () =>
   const result = buildCliRunResult({
     context,
     assistantText: "Checking now\nDone",
+    terminalReplyText: "Checking now\nDone",
     output: transformCliResultText({
       text: "Checking now\nDone",
       textParts: ["Checking now", "Done"],
@@ -311,6 +314,7 @@ it("captures nothing when the CLI's final message was empty after narration", as
   const result = buildCliRunResult({
     context,
     assistantText: "Checking now",
+    terminalReplyText: "Checking now",
     output: transformCliResultText({ text: "Checking now", rawFinalText: "" }),
     usedHistoryPrompt: false,
     userTurnHandled: true,
@@ -327,6 +331,7 @@ it("never captures host-synthesized optional silence as model output", async () 
   const result = buildCliRunResult({
     context,
     assistantText: "",
+    terminalReplyText: "",
     output: { text: "" },
     usedHistoryPrompt: false,
     userTurnHandled: true,
@@ -349,10 +354,12 @@ it.each([
   async ({ parts, visible }) => {
     const context = buildPreparedCliRunContext({ provider: "claude-cli" });
     const output = transformCliResultText({ text: parts.join("\n"), textParts: parts });
+    const assistantReply = prepareCliAssistantReply(output);
     const result = buildCliRunResult({
       context,
       output,
-      assistantText: prepareCliAssistantReply(output).text,
+      assistantText: assistantReply.text,
+      terminalReplyText: assistantReply.terminalText,
       usedHistoryPrompt: false,
       userTurnHandled: true,
       sessionBindingDisabled: true,

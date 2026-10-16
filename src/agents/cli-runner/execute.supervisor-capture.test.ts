@@ -1461,6 +1461,7 @@ describe("executePreparedCliRun supervisor output capture", () => {
           context,
           output,
           assistantText: "",
+          terminalReplyText: "",
           usedHistoryPrompt: false,
           userTurnHandled: true,
           sessionBindingDisabled: true,

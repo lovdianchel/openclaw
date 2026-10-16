@@ -73,6 +73,7 @@ import {
   makeCliResult,
   makeRunAgentAttemptParams,
   makeSessionEntry,
+  persistCliTranscriptEntry,
   resetCliAttemptFixtureDatabases,
   runTrustedClaudeCompletionForTest,
   type RunAgentAttemptOverrides,
@@ -160,16 +161,6 @@ vi.mock("../model-runtime-aliases.js", async () => {
 vi.mock("../embedded-agent.js", () => ({
   runEmbeddedAgent: runEmbeddedAgentMock,
 }));
-
-async function persistCliTranscriptEntry(
-  params: Parameters<typeof persistCliTurnTranscript>[0],
-): Promise<SessionEntry | undefined> {
-  const result = await persistCliTurnTranscript(params);
-  if (result.kind !== "persisted") {
-    throw new Error("expected CLI transcript persistence to keep the current session");
-  }
-  return result.sessionEntry;
-}
 
 type TranscriptReadTarget =
   | string
@@ -957,6 +948,7 @@ describe("CLI attempt execution", () => {
       context,
       output,
       assistantText: output.text,
+      terminalReplyText: output.text,
       effectiveCliSessionId: output.sessionId,
       bindingFlushOk: false,
       usedHistoryPrompt: false,
@@ -1102,6 +1094,7 @@ describe("CLI attempt execution", () => {
           context,
           output: { text: "partial reply", terminalInterruption: { reason } },
           assistantText: "partial reply",
+          terminalReplyText: "partial reply",
           effectiveCliSessionId: replacement ? successorCliSessionId : cliSessionId,
           bindingFlushOk: true,
           usedHistoryPrompt: false,

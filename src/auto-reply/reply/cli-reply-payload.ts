@@ -4,6 +4,7 @@ import {
   type ReplyPayload,
 } from "../reply-payload.js";
 import { normalizeReplyPayloadOutcome } from "./normalize-reply.js";
+import { serializeReplyDirectiveText } from "./reply-directives-core.js";
 import { parseReplyDirectives } from "./reply-directives.js";
 
 export function prepareCliReplyPayload(
@@ -32,6 +33,7 @@ export function prepareCliReplyPayload(
 
 export function prepareCliAssistantReply(output: { text: string; textParts?: string[] }): {
   text: string;
+  terminalText: string;
   hasContent: boolean;
   terminalReplyKind?: "silent-empty";
 } {
@@ -46,6 +48,11 @@ export function prepareCliAssistantReply(output: { text: string; textParts?: str
     text: payloads
       .map((payload) => payload.text?.trim())
       .filter(Boolean)
+      .join("\n"),
+    terminalText: payloads
+      .map(({ text = "", mediaUrls, audioAsVoice }) =>
+        serializeReplyDirectiveText({ text, mediaUrls, audioAsVoice }),
+      )
       .join("\n"),
     hasContent,
     terminalReplyKind:

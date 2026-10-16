@@ -12,12 +12,14 @@ import {
   prepareSystemAgentRunAdmission,
   type AdmittedRunContext,
 } from "./admitted-run-context.js";
+import { normalizeAgentRunTerminalReplySnapshot } from "./agent-run-terminal-reply.js";
 import type { PreparedCliRunContext } from "./cli-runner/types.js";
 import { waitForDeferredTurnMaintenanceForSession } from "./embedded-agent-runner/context-engine-maintenance.js";
 import {
   buildRunEntryTerminal,
   resolveRunEntryTerminalOutcome,
 } from "./embedded-agent-runner/run-entry-terminal.js";
+import { resolveSubagentCompletionResultText } from "./subagents/completion/subagent-completion-result.js";
 
 const { executeMock, historyMock, hookHistoryMock, hookRunnerMock, beforeReplyMock, prepareMock } =
   vi.hoisted(() => ({
@@ -354,7 +356,24 @@ describe("runPreparedCliAgent context engine lifecycle", () => {
       name: "a silent attachment",
       parts: ["No explanation needed.\nNO_REPLY\nMEDIA:https://example.com/result.png"],
       visible: "",
-      disposition: "empty",
+      terminalText: 'MEDIA:"https://example.com/result.png"',
+      disposition: "visible",
+      mediaUrls: ["https://example.com/result.png"],
+    },
+    {
+      name: "a media-only reply",
+      parts: ["MEDIA:https://example.com/result.png"],
+      visible: "",
+      terminalText: 'MEDIA:"https://example.com/result.png"',
+      disposition: "visible",
+      mediaUrls: ["https://example.com/result.png"],
+    },
+    {
+      name: "an earlier attachment before a silent message",
+      parts: ["MEDIA:https://example.com/result.png", "No more text is needed.\nNO_REPLY"],
+      visible: "",
+      terminalText: 'MEDIA:"https://example.com/result.png"',
+      disposition: "visible",
       mediaUrls: ["https://example.com/result.png"],
     },
   ])(
@@ -377,16 +396,23 @@ describe("runPreparedCliAgent context engine lifecycle", () => {
       expect(result.meta.terminalReplyKind).toBe(
         disposition === "silent" ? "silent-empty" : undefined,
       );
+      const terminalReply = buildRunEntryTerminal({
+        result,
+        outcome: resolveRunEntryTerminalOutcome({ result, fallbackExhausted: false }),
+        behavior: { kind: "followup-delivery" },
+        runId: "run-1",
+        requested: { provider: context.params.provider, model: context.modelId },
+        sessionId: context.params.sessionId,
+      }).metadata.terminalReply;
+      expect(terminalReply).toEqual(
+        terminalText || visible ? { disposition, text: terminalText ?? visible } : { disposition },
+      );
       expect(
-        buildRunEntryTerminal({
-          result,
-          outcome: resolveRunEntryTerminalOutcome({ result, fallbackExhausted: false }),
-          behavior: { kind: "followup-delivery" },
-          runId: "run-1",
-          requested: { provider: context.params.provider, model: context.modelId },
-          sessionId: context.params.sessionId,
-        }).metadata.terminalReply,
-      ).toEqual(visible ? { disposition, text: terminalText ?? visible } : { disposition });
+        resolveSubagentCompletionResultText({
+          completion: { terminalReply: normalizeAgentRunTerminalReplySnapshot(terminalReply) },
+          execution: { outcome: { status: "ok" } },
+        }),
+      ).toBe(terminalText || visible || undefined);
       expect(
         result.payloads?.flatMap(
           (payload) => prepareCliReplyPayload(payload.text ?? "").mediaUrls ?? [],
