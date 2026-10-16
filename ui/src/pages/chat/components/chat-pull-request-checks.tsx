@@ -1,4 +1,5 @@
-import { createEffect, createUniqueId, onCleanup, onSettled, untrack } from "solid-js";
+import type { JSX } from "@solidjs/web";
+import { createEffect, createUniqueId, onCleanup, onSettled, untrack, useContext } from "solid-js";
 import { createOverlayAnchor } from "../../../components/overlay-anchor.ts";
 import { createOverlay, findOverlayParent } from "../../../components/overlay-lifecycle.ts";
 import { Icon } from "../../../components/solid/icon.tsx";
@@ -6,7 +7,7 @@ import "../../../components/solid/overlay.css";
 import { acquireNativeOverlaySurface } from "../../../lib/native-overlay-occlusion.ts";
 import { PRESENTATION_CHANGED_EVENT, type PresentationValue } from "../../../lib/presentation.ts";
 import { t } from "../../../lib/reactive/i18n.ts";
-import { LitContent } from "../../../lit/solid-content.tsx";
+import { SolidContentPresentation } from "../../../lit/solid-content.tsx";
 
 export function ChatPullRequestChecks(props: {
   label: string;
@@ -14,15 +15,16 @@ export function ChatPullRequestChecks(props: {
   checksState: string;
   presented: PresentationValue;
   dismissed?: boolean;
-  content: unknown;
+  children: JSX.Element;
 }) {
   let details!: HTMLDetailsElement;
   let trigger!: HTMLElement;
   let surface!: HTMLElement;
   let mounted = false;
+  const parentPresented = useContext(SolidContentPresentation);
   const presented = () => {
     const value = props.presented;
-    return typeof value === "boolean" ? value : value.isPresented();
+    return parentPresented() && (typeof value === "boolean" ? value : value.isPresented());
   };
   const overlay = createOverlay(`chat-pr-checks-${createUniqueId()}`, undefined, {
     interactionElements: () => [details],
@@ -41,7 +43,7 @@ export function ChatPullRequestChecks(props: {
     }
   };
   createEffect(
-    () => [props.presented, props.dismissed] as const,
+    () => [props.presented, parentPresented(), props.dismissed] as const,
     ([value]) => {
       sync();
       if (typeof value === "boolean") {
@@ -102,7 +104,7 @@ export function ChatPullRequestChecks(props: {
         data-anchored-overlay
         popover="manual"
       >
-        <LitContent value={props.content} />
+        {props.children}
       </div>
     </details>
   );
