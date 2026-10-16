@@ -119,13 +119,16 @@ vi.mock("./cli.runtime.js", () => ({
   runQaCredentialsAddCommand,
   runQaCredentialsListCommand,
   runQaCredentialsRemoveCommand,
-  runQaCoverageReportCommand,
   runQaJsonlReplayCommand,
   runQaLabSelfCheckCommand,
   runQaManualLaneCommand,
   runQaProfileCommand,
   runQaProviderServerCommand,
   runQaSuiteCommand,
+}));
+
+vi.mock("./cli-report.runtime.js", () => ({
+  runQaCoverageReportCommand,
 }));
 
 import { registerQaLabCli } from "./cli.js";
