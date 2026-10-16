@@ -186,7 +186,7 @@ export function numberedContentRows(length: number): TestContentRow[] {
   }));
 }
 
-export function mcpRangeRows(appContent: unknown): TestContentRow[] {
+export function mcpRangeRows(appContent: JSX.Element): TestContentRow[] {
   return Array.from({ length: 24 }, (_, index) => ({
     kind: "content" as const,
     key: `row:${index}`,

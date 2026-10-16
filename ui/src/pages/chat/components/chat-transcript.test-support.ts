@@ -193,7 +193,7 @@ export async function mountTestTranscript(
       currentSession = session;
       return session.render(
         rows,
-        (row) => (row.kind === "content" ? row.content : nothing),
+        (row) => (row.kind === "content" ? row.content : null),
         null,
         false,
       );

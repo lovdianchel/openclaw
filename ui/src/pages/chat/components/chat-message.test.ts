@@ -1,6 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { html, nothing, render } from "lit";
+import { createComponent } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectAgentToolActivity } from "../../../../../src/infra/agent-activity-events.js";
 import * as markdown from "../../../components/markdown.ts";
@@ -8,13 +9,14 @@ import type { MessageGroup } from "../../../lib/chat/chat-types.ts";
 import { setAvatarGatewayOrigin } from "../../../lib/identity-avatar-context.ts";
 import * as localStorageModule from "../../../local-storage.ts";
 import { prepareChatHistoryFixture } from "../../../test-helpers/chat-activity-fixtures.ts";
-import { waitForSolid } from "../../../test-helpers/solid-settle.ts";
+import { mountSolid } from "../../../test-helpers/mount-solid.ts";
+import { flush, waitForSolid } from "../../../test-helpers/solid-settle.ts";
 import * as chatAvatar from "../chat-avatar-view.tsx";
 import { attachHistoryActivity } from "../chat-history-request.ts";
 import { buildCachedChatItems } from "../chat-thread.ts";
 import { agentEvent, createHost } from "../tool-stream.test-helpers.ts";
 import { handleAgentEvent } from "../tool-stream.ts";
-import { renderChatNotice } from "./chat-divider.ts";
+import { ChatNotice } from "./chat-divider.tsx";
 import { dismissConfirmedActionPopovers } from "./chat-message-confirmation.ts";
 import { renderActivityGroup, renderMessageGroup } from "./chat-message-group.test-support.ts";
 import { releaseChatMediaResourceSubscriber } from "./chat-message-media.ts";
@@ -471,7 +473,8 @@ function renderNotices(host: ReturnType<typeof createHost>, runId: string, paneI
   if (!items.length || !items.every((item) => item.kind === "notice")) {
     throw new Error("Expected notice projections");
   }
-  render(html`${items.map((item) => renderChatNotice(item))}`, view);
+  mountSolid(() => items.map((item) => createComponent(ChatNotice, { item })), { container: view });
+  flush();
 }
 
 afterEach(() => {
@@ -1311,17 +1314,21 @@ describe("grouped chat rendering", () => {
 
   it("renders multiline system notices as sanitized markdown", () => {
     markdownRenderMock.mockImplementationOnce(renderMarkdownHtml);
-    render(
-      renderChatNotice({
-        kind: "notice",
-        key: "notice:command",
-        icon: "cpu",
-        label: "System",
-        text: "**first line**\nsecond line\n<img src=x onerror=alert(1)><script>alert(1)</script>",
-        timestamp: 1000,
-      }),
-      view,
+    mountSolid(
+      () =>
+        createComponent(ChatNotice, {
+          item: {
+            kind: "notice",
+            key: "notice:command",
+            icon: "cpu",
+            label: "System",
+            text: "**first line**\nsecond line\n<img src=x onerror=alert(1)><script>alert(1)</script>",
+            timestamp: 1000,
+          },
+        }),
+      { container: view },
     );
+    flush();
 
     const notice = view.querySelector<HTMLElement>(".chat-notice");
     expect(notice?.querySelector(".chat-divider__title")?.textContent).toBe("System");
