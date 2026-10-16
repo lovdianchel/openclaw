@@ -1317,12 +1317,14 @@ end
     expect(captureJob).not.toContain("IOS_SCREENSHOT_FASTLANE_VERSION");
     expect(captureJob).toContain("IOS_SCREENSHOT_NODE_VERSION");
     expect(captureJob).toContain("IOS_SCREENSHOT_XCODE_VERSION");
-    expect(captureJob).not.toContain('test "$fastlane_version" = "$IOS_SCREENSHOT_FASTLANE_VERSION"');
+    expect(captureJob).not.toContain(
+      'test "$fastlane_version" = "$IOS_SCREENSHOT_FASTLANE_VERSION"',
+    );
     expect(captureJob).toContain("node-version: ${{ env.IOS_SCREENSHOT_NODE_VERSION }}");
     expect(captureJob).not.toContain("SnapshotDerivedData");
     expect(captureJob.match(/contents: read/g)).toHaveLength(1);
     expect(reducerJob).toContain("needs: [preflight, ios-screenshot-capture]");
-    expect(reducerJob).toContain("merge-multiple: false");
+    expect(reducerJob).not.toContain("merge-multiple:");
     expect(reducerJob).toContain("Setup screenshot evidence Node");
     expect(reducerJob).toContain("node-version: ${{ env.IOS_SCREENSHOT_NODE_VERSION }}");
     expect(reducerJob).toContain("id: reduce_screenshot_evidence");

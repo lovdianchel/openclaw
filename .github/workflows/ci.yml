@@ -5901,9 +5901,9 @@ jobs:
       - name: Download iOS screenshot capture evidence
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          pattern: ios-release-screenshot-capture-${{ needs.preflight.outputs.checkout_revision }}
-          path: apps/ios/build/ScreenshotEvidenceInputs
-          merge-multiple: false
+          name: ios-release-screenshot-capture-${{ needs.preflight.outputs.checkout_revision }}
+          # A single artifact extracts directly into path, without a name subdirectory.
+          path: apps/ios/build/ScreenshotEvidenceInputs/ios-release-screenshot-capture-${{ needs.preflight.outputs.checkout_revision }}
 
       - name: Reduce iOS screenshot evidence
         id: reduce_screenshot_evidence

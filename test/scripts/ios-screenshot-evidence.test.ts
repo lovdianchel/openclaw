@@ -6,6 +6,11 @@ import {
   reduceIosScreenshotEvidence,
 } from "../../scripts/ios-screenshot-evidence.mjs";
 import { useAutoCleanupTempDirTracker } from "../helpers/temp-dir.js";
+import {
+  DOWNLOAD_ARTIFACT_V8,
+  readCiWorkflow,
+  type WorkflowStep,
+} from "./ci-workflow.test-support.js";
 
 const tempDirs = useAutoCleanupTempDirTracker(afterEach);
 const TARGET_SHA = "a".repeat(40);
@@ -173,6 +178,33 @@ function updateAllManifests(input: string, mutate: (manifest: Record<string, any
 }
 
 describe("iOS screenshot evidence", () => {
+  it("reduces the workflow's single named artifact extraction layout", () => {
+    const workflow = readCiWorkflow();
+    const download = workflow.jobs["ios-screenshot-evidence"].steps.find(
+      (step: WorkflowStep) => step.uses === DOWNLOAD_ARTIFACT_V8,
+    ) as WorkflowStep;
+    const revision = "${{ needs.preflight.outputs.checkout_revision }}";
+    expect(download.with?.name).toBe(`ios-release-screenshot-capture-${revision}`);
+    expect(download.with?.pattern).toBeUndefined();
+
+    const root = tempDirs.make("ios-screenshot-receiver-");
+    const input = collectAll(root);
+    const workspace = path.join(root, "workspace");
+    const receiverPath = path.join(
+      workspace,
+      String(download.with?.path).replace(revision, TARGET_SHA),
+    );
+    // download-artifact v8 extracts a single match directly into the requested path.
+    fs.cpSync(path.join(input, containerName()), receiverPath, { recursive: true });
+    const output = path.join(root, "reduced");
+    reduceAll(path.join(workspace, "apps/ios/build/ScreenshotEvidenceInputs"), output);
+
+    expect(fs.readdirSync(path.join(output, "apps/ios/fastlane/screenshots/en-US"))).toHaveLength(
+      9,
+    );
+    expect(fs.readdirSync(path.join(output, "apps/ios/build/SnapshotTestResults"))).toHaveLength(8);
+  });
+
   it.each([{ reducerAttempt: 4, captureAttempt: 3 }])(
     "reduces successful device captures across workflow retries: %j",
     ({ reducerAttempt, captureAttempt }) => {
@@ -225,7 +257,10 @@ describe("iOS screenshot evidence", () => {
     "rejects a passing retry after a failed capture: %j",
     (options) => {
       const root = tempDirs.make("ios-screenshot-retry-");
-      const source = writeCombinedSource(root, "iphone", { retry: "02-chat-connected", ...options });
+      const source = writeCombinedSource(root, "iphone", {
+        retry: "02-chat-connected",
+        ...options,
+      });
 
       expect(() =>
         collectIosScreenshotEvidence({
@@ -489,7 +524,9 @@ describe("iOS screenshot evidence", () => {
       if (kind === "PNG") {
         fs.writeFileSync(path.join(source.screenshots, "Unknown-01-control-connected.png"), PNG);
       } else if (kind === "xcresult") {
-        fs.mkdirSync(path.join(source.xcresults, "Unknown-01-control-connected-attempt-1.xcresult"));
+        fs.mkdirSync(
+          path.join(source.xcresults, "Unknown-01-control-connected-attempt-1.xcresult"),
+        );
       } else {
         const ledgerPath = path.join(source.xcresults, "capture-attempts.json");
         const ledger = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
