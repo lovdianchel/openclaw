@@ -213,7 +213,7 @@ export function registerRequiredReplyCompletionCases({
       },
     },
     { label: "heartbeat", params: { opts: { isHeartbeat: true } } },
-  ])("records failed empty $label completions without a chat notice", async ({ params }) => {
+  ])("completes optional empty $label turns without a chat notice", async ({ params }) => {
     state.runEmbeddedAgentMock.mockResolvedValueOnce({ payloads: [], meta: {} });
     const onAgentRunTerminalOutcome = vi.fn();
     const runState: ReplyOperationRunState = {};
@@ -223,8 +223,8 @@ export function registerRequiredReplyCompletionCases({
     });
 
     await expect(run()).resolves.toBeUndefined();
-    expect(onAgentRunTerminalOutcome).toHaveBeenLastCalledWith("failed");
-    expect(resolveReplyOperationAgentTurn(runState)).toBe("failed");
+    expect(onAgentRunTerminalOutcome).toHaveBeenLastCalledWith("completed");
+    expect(resolveReplyOperationAgentTurn(runState)).toBe("ok");
   });
 
   it("retains a failed heartbeat result without lifting its missing-answer notice", async () => {

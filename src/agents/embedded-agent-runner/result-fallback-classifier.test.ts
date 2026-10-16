@@ -634,6 +634,10 @@ describe("classifyEmbeddedAgentRunResultForModelFallback", () => {
       label: "an exact terminal tool batch intentionally completes the turn",
       meta: { intentionalTerminalCompletion: "tool-batch" as const },
     },
+    {
+      label: "an optional empty result completes without a reply",
+      meta: { terminalReply: { disposition: "empty" as const } },
+    },
   ])("does not fallback after $label", ({ meta }) => {
     const result = classifyEmbeddedAgentRunResultForModelFallback({
       provider: "openai",

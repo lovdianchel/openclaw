@@ -492,6 +492,20 @@ describe("terminal resolution", () => {
     },
   );
 
+  it("completes optional empty output without recovery or a silent classification", async () => {
+    const input = makeTerminalInput({ runParams: { terminalReplyExpectation: "optional" } });
+    const resolved = await resolveEmbeddedRunTerminal(input);
+
+    expect(resolved.action).toBe("complete");
+    if (resolved.action !== "complete") {
+      throw new Error("expected optional completion");
+    }
+    expect(resolved.result.meta.terminalReply).toEqual({ disposition: "empty" });
+    expect(resolved.result.meta.error).toBeUndefined();
+    expect(resolved.result.payloads).toBeUndefined();
+    expect(input.sessionPromptState.activateInternalPrompt).not.toHaveBeenCalled();
+  });
+
   it("retries reasoning-only output and surfaces a retained presentation after exhaustion", async () => {
     const assistant = buildEmbeddedRunnerAssistant({
       content: [

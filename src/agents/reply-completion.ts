@@ -40,7 +40,7 @@ export function createMissingReplyNotice(text = MISSING_REPLY_NOTICE_TEXT): Repl
 
 export type ReplyCompletion = {
   readonly expectation: ReplyExpectation;
-  readonly outcome: Exclude<ReplyCompletionEvidence, "empty"> | "missing";
+  readonly outcome: ReplyCompletionEvidence | "missing";
 };
 
 const EMPTY_REPLY_CONFIG: OpenClawConfig = {};
@@ -145,7 +145,7 @@ export function shouldDeliverMissingReplyNotice(
   },
 ): boolean {
   return (
-    resolveReplyExpectation(params) !== "result-required" &&
+    resolveReplyExpectation(params) === "required" &&
     !isSyntheticSourceReplyTurn(params) &&
     params.currentInboundEventKind !== "room_event" &&
     (params.trigger === undefined || params.trigger === "user" || params.trigger === "manual")
@@ -160,7 +160,8 @@ export function resolveReplyCompletion(
   return {
     expectation,
     outcome:
-      evidence === "empty" || (evidence === "silent" && expectation === "result-required")
+      (evidence === "empty" && expectation !== "optional") ||
+      (evidence === "silent" && expectation === "result-required")
         ? "missing"
         : evidence,
   };

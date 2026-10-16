@@ -122,6 +122,7 @@ export function resolveSettledTurnFinalizationRequest(input: {
   const terminalAssistant = resolveCurrentAttemptAssistant(input.attempt);
   if (
     !input.settledTurnFinalizationAvailable ||
+    resolveReplyExpectation(input.runParams) === "optional" ||
     isTerminalAssistantError(terminalAssistant) ||
     (input.replyDeliveryState ?? "missing") !== "missing"
   ) {
@@ -214,6 +215,7 @@ export async function resolveEmbeddedRunTerminal(input: {
   contextRecoveryState: EmbeddedRunContextRecoveryState;
 }): Promise<TerminalResolution> {
   const { runParams, attempt, retryState, sessionPromptState } = input;
+  const replyExpectation = resolveReplyExpectation(runParams);
   const runLogContext = `runId=${runParams.runId} sessionId=${runParams.sessionId}`;
   const modelLogContext = `${runLogContext} provider=${input.activeErrorContext.provider}/${input.activeErrorContext.model}`;
   const { externalAbort, promptError } = projectAgentRunAttemptTerminal(attempt.terminal);
@@ -239,21 +241,22 @@ export async function resolveEmbeddedRunTerminal(input: {
   // its settled side effects cascade into any ordinary retry family.
   const settledTurnFinalizationAttempted = input.settledTurnFinalizationOutcome !== "not-attempted";
   const emptyAssistantReplyIsSilent = shouldTreatEmptyAssistantReplyAsSilent({
-    terminalReplyExpectation: resolveReplyExpectation(runParams),
+    terminalReplyExpectation: replyExpectation,
     ...terminalFacts,
   });
   const authoredSilenceRequiresResult =
-    resolveReplyExpectation(runParams) === "result-required" &&
-    classifyAssistantTurn(terminalFacts).silent;
+    replyExpectation === "result-required" && classifyAssistantTurn(terminalFacts).silent;
   const replyRecoverySuppressed =
     !authoredSilenceRequiresResult &&
-    (emptyAssistantReplyIsSilent || input.prepared.replyDeliveryState !== "missing");
+    (replyExpectation === "optional" ||
+      emptyAssistantReplyIsSilent ||
+      input.prepared.replyDeliveryState !== "missing");
   const retryInput = {
     provider: input.activeErrorContext.provider,
     modelId: input.activeErrorContext.model,
     modelApi: input.modelApi,
     executionContract: input.executionContract,
-    terminalReplyExpectation: resolveReplyExpectation(runParams),
+    terminalReplyExpectation: replyExpectation,
     replyDeliveryState: input.prepared.replyDeliveryState,
     ...terminalFacts,
   };

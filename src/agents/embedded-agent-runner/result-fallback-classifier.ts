@@ -250,9 +250,12 @@ export function classifyEmbeddedAgentRunResultForModelFallback(params: {
     };
   }
 
-  // Once the shared visibility owner finds no deliverable assistant payload,
-  // empty and reasoning-only output must advance fallback for every model.
-  if (params.result.meta.terminalReply?.disposition === "silent") {
+  // The producer marks an owed missing result as an error; a clean empty fact
+  // completes optional input without manufacturing another model turn.
+  if (
+    params.result.meta.terminalReply?.disposition === "silent" ||
+    (params.result.meta.terminalReply?.disposition === "empty" && !terminalError)
+  ) {
     return null;
   }
   const harnessClassification = classifyHarnessResult(

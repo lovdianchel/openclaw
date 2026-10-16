@@ -18,7 +18,7 @@ const REQUIRED_RESULT_TOOL_TERMINAL_CONTINUATION_INSTRUCTION =
   "Your turn ended without a final result. Continue from the current transcript and produce the required result now. NO_REPLY is not allowed. Do not repeat completed tool calls or restart from scratch. Tools are unavailable in this step: it is a text-only pass, so reply with plain text and do not attempt any tool call.";
 
 describe("resolveSettledTurnFinalizationRequest", () => {
-  it("requests isolated finalization for empty settled-tool turns under every expectation", () => {
+  it("requests isolated finalization only when empty settled-tool turns owe a result", () => {
     const assistant = buildEmbeddedRunnerAssistant({ content: [{ type: "text", text: "" }] });
     const attempt = makeEmbeddedRunnerAttempt({
       assistantTexts: [],
@@ -47,7 +47,7 @@ describe("resolveSettledTurnFinalizationRequest", () => {
       });
 
     expect(request("required")).toBe(SETTLED_TOOL_TERMINAL_CONTINUATION_INSTRUCTION);
-    expect(request("optional")).toBe(SETTLED_TOOL_TERMINAL_CONTINUATION_INSTRUCTION);
+    expect(request("optional")).toBeNull();
     expect(request("result-required")).toBe(REQUIRED_RESULT_TOOL_TERMINAL_CONTINUATION_INSTRUCTION);
     expect(
       resolveSettledTurnFinalizationRequest({
