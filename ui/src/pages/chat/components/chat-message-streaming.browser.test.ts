@@ -434,11 +434,16 @@ describe("streaming Markdown DOM", () => {
           },
         );
         createEffect(presented, (connected) => {
-          if (initial) initial = false;
-          else connections.push(connected);
+          if (initial) {
+            initial = false;
+          } else {
+            connections.push(connected);
+          }
         });
         onCleanup(() => {
-          if (presented()) connections.push(false);
+          if (presented()) {
+            connections.push(false);
+          }
         });
         return button;
       }

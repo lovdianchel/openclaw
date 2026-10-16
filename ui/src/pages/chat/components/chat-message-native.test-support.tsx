@@ -219,7 +219,7 @@ export function render(value: Content, container: HTMLElement) {
   if (value == null) {
     mounted?.unmount();
     mounts.delete(container);
-    return;
+    return undefined;
   }
   if (!mounted) {
     const [content, update] = createSignal<Content>(value, { equals: false });
@@ -233,9 +233,9 @@ export function render(value: Content, container: HTMLElement) {
       { container },
     );
     mounted = {
-      update: (value) => update(() => value),
-      setConnected: (value) => {
-        setPresented(value);
+      update: (next) => update(() => next),
+      setConnected: (connected) => {
+        setPresented(connected);
         flush();
       },
       unmount: view.unmount,

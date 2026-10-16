@@ -92,7 +92,7 @@ function mountIntegratedPresenceHeader(params: {
       null,
     );
   const [content, setContent] = createSignal(header());
-  const mounted = mountSolid(
+  mountSolid(
     () =>
       createComponent(LitContent, {
         get value() {
@@ -101,7 +101,6 @@ function mountIntegratedPresenceHeader(params: {
       }),
     { container },
   );
-  onTestFinished(mounted.unmount);
   const renderHeader = () => {
     setContent(header());
     flush();
