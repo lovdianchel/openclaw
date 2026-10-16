@@ -100,7 +100,7 @@ it.each(["future", "metadata", "trigger"])(
         raw.exec("UPDATE schema_meta SET schema_version=14 WHERE meta_key='primary'");
       } else {
         raw.exec(
-          "CREATE TRIGGER unexpected_recovery_write AFTER UPDATE ON config_machine_state BEGIN UPDATE schema_meta SET app_version='unexpected'; END;",
+          "CREATE TRIGGER unexpected_recovery_write AFTER UPDATE ON update_runs BEGIN UPDATE schema_meta SET app_version='unexpected'; END;",
         );
       }
     } finally {
