@@ -24,6 +24,7 @@ export type { MediaPayload } from "../channels/plugins/media-payload.js";
 export { buildMediaPayload } from "../channels/plugins/media-payload.js";
 /** Plugin-facing reply payload without core-only trusted local media internals. */
 export type ReplyPayload = Omit<InternalReplyPayload, "trustedLocalMedia">;
+export { parseReplyDirectives } from "../auto-reply/reply/reply-directives.js";
 
 /** The shared dispatcher will persist confirmed delivery; channel adapters must not mirror it. */
 export function hasReplyPayloadFinalDeliveryCapture(payload: ReplyPayload): boolean {

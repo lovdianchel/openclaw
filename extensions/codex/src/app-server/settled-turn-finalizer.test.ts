@@ -330,7 +330,7 @@ describe("runCodexSettledTurnFinalization", () => {
     expect(mocks.mirror).not.toHaveBeenCalled();
   });
 
-  it.each([" NO_REPLY\n", "draft\nNO_REPLY", " "])(
+  it.each([" NO_REPLY\n", "draft\nNO_REPLY", "draft\nNO_REPLY\n[[reply_to_current]]", " "])(
     "preserves silent managed Stop-hook output %j",
     async (text) => {
       mocks.runBounded.mockResolvedValue({
@@ -349,6 +349,20 @@ describe("runCodexSettledTurnFinalization", () => {
       expect(mocks.mirror).not.toHaveBeenCalled();
     },
   );
+
+  it.each([
+    "MEDIA:https://example.test/result.png\nDraft reasoning.\nNO_REPLY",
+    "Draft reasoning.\nNO_REPLY\nMEDIA:https://example.test/result.png",
+    "Draft reasoning.\nMEDIA:media://inbound/\nNO_REPLY",
+  ])("retains authored media and failure evidence for host settlement: %s", async (text) => {
+    mocks.runBounded.mockResolvedValue({ ...boundedResult(), text });
+    const result = await finalize();
+    expect(mocks.mirror).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      assistant: { content: [{ type: "text", text }] },
+      assistantTranscriptOwned: true,
+    });
+  });
 
   it.each([
     {
