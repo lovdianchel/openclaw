@@ -1,4 +1,4 @@
-import type { SqliteSchemaCatalog, SqliteSchemaSource } from "./sqlite-schema-catalog.js";
+import type { SqliteSchemaCatalog, SqliteSchemaSource } from "./sqlite-schema-catalog-types.js";
 import {
   assertSqliteSchemaContains as assertContains,
   assertSqliteSchemaTablesPresent as assertTablesPresent,

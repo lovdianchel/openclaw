@@ -298,7 +298,7 @@ function workerDeployBuildConfig(entry: Record<string, string>, split = false): 
     },
     plugins: [
       createStateSchemaInlinePlugin(),
-      createSqliteSchemaAssetsPlugin(),
+      createSqliteSchemaAssetsPlugin(undefined, undefined, { workerChunks: true }),
       createWorkerDeployBuildPlugin(),
     ],
     shims: true,

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { SqliteSchemaCatalog } from "./sqlite-schema-catalog.js";
+import type { SqliteSchemaCatalog } from "./sqlite-schema-catalog-types.js";
 import { normalizeSchemaSql } from "./sqlite-schema-sql.js";
 
 export type SqliteSchemaSelection = {

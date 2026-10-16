@@ -1,62 +1,94 @@
 import type { DatabaseSync } from "node:sqlite";
+import type {
+  SqliteColumnCatalog,
+  SqliteForeignKeyCatalog,
+  SqliteIndexListRow,
+  SqliteIndexTermRow,
+  SqliteSchemaCatalog,
+  SqliteSchemaRow,
+  SqliteTableListRow,
+  SqliteViewCatalog,
+} from "./sqlite-schema-catalog-types.js";
 import {
   createSqliteIndexContract,
   createSqliteTableContract,
-  type SqliteIndexListRow,
-  type SqliteIndexTermRow,
-  type SqliteSchemaRow,
   type SqliteTableContract,
-  type SqliteTableListRow,
 } from "./sqlite-schema-contract-assembly.js";
 import { normalizeSchemaSql, quoteSqliteIdentifier } from "./sqlite-schema-sql.js";
 
-export type SqliteColumnCatalog = {
-  readonly cid: number;
-  readonly name: string;
-  readonly type: string;
-  readonly notnull: number;
-  readonly dflt_value: string | null;
-  readonly pk: number;
-  readonly hidden: number;
+export type SqliteTableContractReader = ((tableName: string) => SqliteTableContract | undefined) & {
+  readCatalog?: (
+    viewNames: readonly string[],
+    tableNames: readonly string[],
+  ) => SqliteSchemaCatalog;
+  readView?: (viewName: string) => SqliteViewCatalog | undefined;
 };
 
-export type SqliteForeignKeyCatalog = {
-  readonly id: number;
-  readonly seq: number;
-  readonly table: string;
-  readonly from: string;
-  readonly to: string | null;
-  readonly on_update: string;
-  readonly on_delete: string;
-  readonly match: string;
-};
-
-export type SqliteViewCatalog = {
-  readonly name: string;
-  readonly sql: string | null;
-  readonly columns: readonly SqliteColumnCatalog[];
-  readonly triggers: readonly Readonly<SqliteSchemaRow>[];
-};
-
-export type SqliteSchemaCatalog = {
-  readonly tables: readonly {
-    readonly name: string;
-    readonly sql: string | null;
-    readonly strict: number;
-    readonly withoutRowid: number;
-    readonly columns: readonly SqliteColumnCatalog[];
-    readonly foreignKeys: readonly SqliteForeignKeyCatalog[];
-    readonly indexes: readonly (Readonly<SqliteIndexListRow> & {
-      readonly sql: string | null;
-      readonly terms: readonly Readonly<SqliteIndexTermRow>[];
-    })[];
-    readonly triggers: readonly Readonly<SqliteSchemaRow>[];
-  }[];
-  readonly views: readonly SqliteViewCatalog[];
-};
-
-/** Generated strings have no runtime DDL path; dynamic migration owners supply native facts. */
-export type SqliteSchemaSource = string | SqliteSchemaCatalog;
+/** Reuse actual catalog facts only within one unchanged read transaction on this connection. */
+export function createSqliteTableContractReader(
+  database: DatabaseSync,
+  viewNames: readonly string[] = [],
+  tableNames: readonly string[] = [],
+) {
+  let catalog: SqliteSchemaCatalog | undefined;
+  let tables: ReadonlyMap<string, SqliteTableContract> | undefined;
+  const unreadVirtualTables = new Set<string>();
+  const readCatalog = (requestedTableNames: readonly string[] = []) => {
+    if (!catalog) {
+      const virtualTableNames = [...tableNames, ...requestedTableNames];
+      catalog = readSqliteSchemaCatalog(database, { viewNames, virtualTableNames });
+      for (const table of catalog.tables) {
+        if (
+          table.sql &&
+          /^CREATE VIRTUAL TABLE /iu.test(table.sql) &&
+          !virtualTableNames.includes(table.name)
+        ) {
+          unreadVirtualTables.add(table.name);
+        }
+      }
+    } else {
+      for (const name of requestedTableNames) {
+        if (!unreadVirtualTables.has(name)) {
+          continue;
+        }
+        const columns = readSqliteColumnCatalog(database, name);
+        catalog = {
+          ...catalog,
+          tables: catalog.tables.map((table) =>
+            table.name === name ? { ...table, columns } : table,
+          ),
+        };
+        unreadVirtualTables.delete(name);
+        tables = undefined;
+      }
+    }
+    return catalog;
+  };
+  return Object.assign(
+    (tableName: string) => {
+      const currentCatalog = readCatalog([tableName]);
+      return (tables ??= sqliteSchemaContractFromCatalog(currentCatalog)).get(tableName);
+    },
+    {
+      readCatalog: (expectedViewNames: readonly string[], expectedTableNames: readonly string[]) =>
+        expectedViewNames.every((name) => viewNames.includes(name))
+          ? readCatalog(expectedTableNames)
+          : readSqliteSchemaCatalog(database, {
+              viewNames: expectedViewNames,
+              virtualTableNames: expectedTableNames,
+            }),
+      readView: (viewName: string) => {
+        const views = viewNames.includes(viewName)
+          ? readCatalog().views
+          : readSqliteSchemaCatalog(database, {
+              viewNames: [viewName],
+              virtualTableNames: [],
+            }).views;
+        return views.find((view) => view.name === viewName);
+      },
+    },
+  );
+}
 
 /** Preserve admission's historical column-order and automatic-index-name compatibility. */
 export function sqliteSchemaContractFromCatalog(
@@ -103,11 +135,12 @@ function groupRows<Row, Key extends string | number>(
 /** Read one native catalog in six statements, independent of its table count. */
 export function readSqliteSchemaCatalog(
   database: DatabaseSync,
-  options: { viewNames?: readonly string[] } = {},
+  options: { viewNames?: readonly string[]; virtualTableNames?: readonly string[] } = {},
 ): SqliteSchemaCatalog {
   // Selecting the original columns preserves catalog authorizer behavior, including empty stores.
   const objects = database
     .prepare("SELECT type, name, tbl_name, sql FROM main.sqlite_schema ORDER BY name")
+    // SAFETY: SQLite owns these catalog columns and their fixed string/null types.
     .all() as CatalogObject[];
   const tables = objects.filter((row) => row.type === "table" && !row.name.startsWith("sqlite_"));
   const views = objects.filter(
@@ -116,7 +149,20 @@ export function readSqliteSchemaCatalog(
   if (tables.length === 0 && views.length === 0) {
     return { tables: [], views: [] };
   }
-  const tableOptions = database.prepare("PRAGMA table_list").all() as SqliteTableListRow[];
+  // SAFETY: Native table_list returns string schema/name and integer strict/wr flags.
+  const tableOptions = database.prepare("PRAGMA table_list").all() as (SqliteTableListRow & {
+    type: string;
+  })[];
+  // Unrelated virtual tables may require an extension that this connection does not load.
+  const deferredVirtualTables = tableOptions
+    .filter(
+      (row) =>
+        row.schema === "main" &&
+        row.type === "virtual" &&
+        options.virtualTableNames &&
+        !options.virtualTableNames.includes(row.name),
+    )
+    .map((row) => row.name);
   // A table/view in either schema can shadow a table-valued PRAGMA. Native PRAGMAs cannot be shadowed.
   const shadowed = tableOptions.some((row) =>
     [
@@ -137,6 +183,7 @@ export function readSqliteSchemaCatalog(
           CROSS JOIN pragma_index_list(t.name, 'main') AS i
           WHERE t.type = 'table' AND substr(t.name, 1, 7) <> 'sqlite_'
         `)
+          // SAFETY: Unshadowed index_list provides the selected string names/origin and integer flags/seq.
           .all() as IndexRow[],
         (row) => row.table_name,
       );
@@ -153,6 +200,7 @@ export function readSqliteSchemaCatalog(
           WHERE t.type = 'table' AND substr(t.name, 1, 7) <> 'sqlite_'
           ORDER BY t.name, i.seq, x.seqno
         `)
+          // SAFETY: Unshadowed index_xinfo provides fixed string/null term fields and integer flags/positions.
           .all() as IndexTermRow[],
         (row) => row.table_name,
       );
@@ -162,6 +210,9 @@ export function readSqliteSchemaCatalog(
     : options.viewNames.length > 0
       ? `t.type = 'table' OR (t.type = 'view' AND t.name IN (${options.viewNames.map(() => "?").join(", ")}))`
       : "t.type = 'table'";
+  const columnTableClause = deferredVirtualTables.length
+    ? `AND t.name NOT IN (${deferredVirtualTables.map(() => "?").join(", ")})`
+    : "";
   const columns = shadowed
     ? undefined
     : groupRows(
@@ -171,9 +222,11 @@ export function readSqliteSchemaCatalog(
           FROM main.sqlite_schema AS t
           CROSS JOIN pragma_table_xinfo(t.name, 'main') AS x
           WHERE (${columnObjectClause}) AND substr(t.name, 1, 7) <> 'sqlite_'
+            ${columnTableClause}
           ORDER BY t.name, x.cid
         `)
-          .all(...(options.viewNames ?? [])) as ColumnRow[],
+          // SAFETY: Unshadowed table_xinfo provides fixed string/null column fields and integer flags/positions.
+          .all(...(options.viewNames ?? []), ...deferredVirtualTables) as ColumnRow[],
         (row) => row.table_name,
       );
   const foreignKeys = shadowed
@@ -188,6 +241,7 @@ export function readSqliteSchemaCatalog(
           WHERE t.type = 'table' AND substr(t.name, 1, 7) <> 'sqlite_'
           ORDER BY t.name, f.id, f.seq
         `)
+          // SAFETY: Unshadowed foreign_key_list provides string/null identifiers/actions and integer id/seq.
           .all() as ForeignKeyRow[],
         (row) => row.table_name,
       );
@@ -203,11 +257,11 @@ export function readSqliteSchemaCatalog(
     sql: normalizeSchemaSql(row.sql),
   });
   const readColumns = (name: string): SqliteColumnCatalog[] =>
-    columns
-      ? (columns.get(name) ?? []).map(({ table_name: _tableName, ...column }) => column)
-      : (database
-          .prepare(`PRAGMA main.table_xinfo(${quoteSqliteIdentifier(name)})`)
-          .all() as SqliteColumnCatalog[]);
+    deferredVirtualTables.includes(name)
+      ? []
+      : columns
+        ? (columns.get(name) ?? []).map(({ table_name: _tableName, ...column }) => column)
+        : readSqliteColumnCatalog(database, name);
   const readTriggers = (name: string) => (triggers.get(name) ?? []).map(normalizedRow);
   return {
     tables: tables.map((table) => {
@@ -222,6 +276,7 @@ export function readSqliteSchemaCatalog(
         : (
             database
               .prepare(`PRAGMA main.index_list(${quoteSqliteIdentifier(table.name)})`)
+              // SAFETY: Native index_list provides string names/origin and integer flags/seq.
               .all() as (SqliteIndexListRow & { seq: number })[]
           ).map(({ name, origin, partial, unique, seq }) => ({
             name,
@@ -243,6 +298,7 @@ export function readSqliteSchemaCatalog(
             )
           : (database
               .prepare(`PRAGMA main.foreign_key_list(${quoteSqliteIdentifier(table.name)})`)
+              // SAFETY: Native foreign_key_list provides string/null identifiers/actions and integer id/seq.
               .all() as SqliteForeignKeyCatalog[]),
         indexes: nativeIndexes
           .map((index) => ({
@@ -257,6 +313,7 @@ export function readSqliteSchemaCatalog(
                 )
               : (database
                   .prepare(`PRAGMA main.index_xinfo(${quoteSqliteIdentifier(index.name)})`)
+                  // SAFETY: Native index_xinfo provides string/null term fields and integer flags/positions.
                   .all() as SqliteIndexTermRow[]),
           }))
           .toSorted((left, right) => left.name.localeCompare(right.name)),
@@ -270,6 +327,15 @@ export function readSqliteSchemaCatalog(
       triggers: readTriggers(view.name),
     })),
   };
+}
+
+function readSqliteColumnCatalog(database: DatabaseSync, name: string): SqliteColumnCatalog[] {
+  return (
+    database
+      .prepare(`PRAGMA main.table_xinfo(${quoteSqliteIdentifier(name)})`)
+      // SAFETY: Native table_xinfo provides string/null column fields and integer flags/positions.
+      .all() as SqliteColumnCatalog[]
+  );
 }
 
 function compareJson(left: unknown, right: unknown): number {

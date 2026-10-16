@@ -2,14 +2,12 @@ import type { DatabaseSync } from "node:sqlite";
 import type {
   SqliteColumnCatalog,
   SqliteForeignKeyCatalog,
-  SqliteSchemaCatalog,
-} from "../../src/infra/sqlite-schema-catalog.ts";
-import type {
   SqliteIndexListRow,
   SqliteIndexTermRow,
+  SqliteSchemaCatalog,
   SqliteSchemaRow,
   SqliteTableListRow,
-} from "../../src/infra/sqlite-schema-contract-assembly.ts";
+} from "../../src/infra/sqlite-schema-catalog-types.ts";
 import { normalizeSchemaSql, quoteSqliteIdentifier } from "../../src/infra/sqlite-schema-sql.ts";
 
 /** Build-time only: record the native catalog, including expression text and hidden columns. */

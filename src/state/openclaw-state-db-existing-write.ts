@@ -77,13 +77,15 @@ function assertExistingOpenClawStateSchemaMetadata(
 function assertExistingOpenClawStateSchema(
   db: DatabaseSync,
   pathname: string,
-  schemaSql: string,
+  schemaSql: string | undefined,
   compatibility?: SqliteSchemaCompatibility,
 ): number {
   const version = assertSupportedStateSchemaVersion(db, pathname);
   assertExistingOpenClawStateSchemaMetadata(db, pathname, version);
   assertStateDatabaseIntegrityOnce(db, pathname);
-  assertSqliteSchemaContains(db, pathname, schemaSql, compatibility);
+  if (schemaSql !== undefined) {
+    assertSqliteSchemaContains(db, pathname, schemaSql, compatibility);
+  }
   return version;
 }
 
@@ -208,7 +210,7 @@ function createExistingOpenClawStateWriter(
             assertExistingOpenClawStateSchema(
               db,
               pathname,
-              needsAdmission && contract.initializeAdditiveSchema ? "" : contract.schemaSql,
+              needsAdmission && contract.initializeAdditiveSchema ? undefined : contract.schemaSql,
               contract.schemaCompatibility,
             );
           let version: number;

@@ -5,11 +5,15 @@ import { build } from "tsdown";
 import { expect, it } from "vitest";
 import { createSqliteSchemaAssetsPlugin } from "../../scripts/lib/sqlite-schema-assets.mts";
 import { createStateSchemaInlinePlugin } from "../../scripts/lib/state-schema-inline-plugin.mts";
+import { createWorkerDeployBuildPlugin } from "../../scripts/lib/worker-deploy-build-plugin.mts";
 import { createScriptTestHarness } from "./test-helpers.js";
 
 const { createTempDir } = createScriptTestHarness();
 
-it("loads diagnostic catalogs lazily from relocated installed assets", async () => {
+it.each([
+  { name: "installed assets", workerChunks: false },
+  { name: "sealed worker chunks", workerChunks: true },
+])("loads diagnostic catalogs lazily from relocated $name", async ({ workerChunks }) => {
   const root = fs.realpathSync(createTempDir("sqlite-schema-assets-"));
   const entry = path.join(root, "entry.ts");
   fs.writeFileSync(
@@ -24,29 +28,40 @@ export const catalogs = () => [OPENCLAW_STATE_SCHEMA_SQL, OPENCLAW_AGENT_SCHEMA_
   const outDir = path.join(root, "build");
   const { bundles } = await build({
     config: false,
-    entry,
+    entry: workerChunks ? { "worker/worker": entry } : entry,
     outDir,
     platform: "node",
     format: "esm",
     dts: false,
     outExtensions: () => ({ js: ".mjs" }),
-    plugins: [createStateSchemaInlinePlugin(), createSqliteSchemaAssetsPlugin()],
+    outputOptions: workerChunks
+      ? { codeSplitting: false, chunkFileNames: "worker/worker-chunk-[hash].mjs" }
+      : undefined,
+    plugins: [
+      createStateSchemaInlinePlugin(),
+      createSqliteSchemaAssetsPlugin(undefined, undefined, { workerChunks }),
+      workerChunks ? createWorkerDeployBuildPlugin() : undefined,
+    ],
     logLevel: "silent",
   });
   try {
     const installed = path.join(root, "relocated");
-    fs.renameSync(outDir, installed);
+    if (workerChunks) {
+      expect(fs.readdirSync(outDir)).toEqual(["worker"]);
+    }
+    fs.renameSync(workerChunks ? path.join(outDir, "worker") : outDir, installed);
     const result = execFileSync(
       process.execPath,
       [
         "--input-type=module",
         "-e",
         `import fs from 'node:fs';
-const assets = new URL('./assets/', import.meta.url);
-fs.renameSync(assets, new URL('./held-assets/', import.meta.url));
-const owner = await import('./entry.mjs');
+const files = ${workerChunks ? "fs.readdirSync('.').filter(name => name.startsWith('worker-chunk-sqlite-'))" : "['assets']"};
+if (files.length === 0) throw new Error('No diagnostic files were emitted');
+for (const file of files) fs.renameSync(file, file + '.held');
+const owner = await import(${JSON.stringify(workerChunks ? "./worker.mjs" : "./entry.mjs")});
 const fingerprints = owner.fingerprints();
-fs.renameSync(new URL('./held-assets/', import.meta.url), assets);
+for (const file of files) fs.renameSync(file + '.held', file);
 const catalogs = owner.catalogs();
 console.log(JSON.stringify(fingerprints.map((fingerprint, index) => ({
   fingerprint: fingerprint.fingerprint,

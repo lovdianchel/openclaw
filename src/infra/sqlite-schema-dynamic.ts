@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { openNodeSqliteDatabase } from "./node-sqlite.js";
-import { readSqliteSchemaCatalog, type SqliteSchemaCatalog } from "./sqlite-schema-catalog.js";
+import type { SqliteSchemaCatalog } from "./sqlite-schema-catalog-types.js";
+import { readSqliteSchemaCatalog } from "./sqlite-schema-catalog.js";
 import {
   assertSqliteSchemaContains,
   type SqliteSchemaCompatibility,

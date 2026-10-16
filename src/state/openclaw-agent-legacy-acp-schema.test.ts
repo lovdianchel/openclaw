@@ -5,7 +5,7 @@ import { assertSqliteSchemaContains } from "../infra/sqlite-schema-contract.test
 import { extractSqliteTableSchema } from "../infra/sqlite-schema-sql.js";
 import { runSqliteImmediateTransactionSync } from "../infra/sqlite-transaction.js";
 import { OPENCLAW_AGENT_SCHEMA_VERSION } from "./openclaw-agent-db-contract.js";
-import { assertOpenClawAgentSchemaContains } from "./openclaw-agent-db-schema-helpers.js";
+import { AGENT_SCHEMA_COMPATIBILITY } from "./openclaw-agent-db-schema-compatibility.js";
 import {
   ensureLegacyAcpMigrationProvenanceColumn,
   hasLegacyAcpMigrationProvenanceColumn,
@@ -96,7 +96,7 @@ describe("legacy ACP migration provenance schema", () => {
 
     expect(hasLegacyAcpMigrationProvenanceColumn(database)).toBe(false);
     expect(() =>
-      assertOpenClawAgentSchemaContains(database, ":memory:", SESSION_SCHEMA),
+      assertSqliteSchemaContains(database, ":memory:", SESSION_SCHEMA, AGENT_SCHEMA_COMPATIBILITY),
     ).not.toThrow();
     expect(database.prepare("SELECT sql FROM sqlite_schema ORDER BY name").all()).toEqual(schema);
     expect(database.prepare("SELECT * FROM session_nodes").all()).toEqual(rows);

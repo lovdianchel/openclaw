@@ -1,4 +1,11 @@
-import type { SqliteColumnCatalog, SqliteForeignKeyCatalog } from "./sqlite-schema-catalog.js";
+import type {
+  SqliteColumnCatalog,
+  SqliteForeignKeyCatalog,
+  SqliteIndexListRow,
+  SqliteIndexTermRow,
+  SqliteSchemaRow,
+  SqliteTableListRow,
+} from "./sqlite-schema-catalog-types.js";
 import {
   findSqlCharacter,
   findSqlClosingParenthesis,
@@ -10,37 +17,8 @@ import {
   splitSqlList,
 } from "./sqlite-schema-sql.js";
 
-export type SqliteIndexListRow = {
-  name: string;
-  origin: string;
-  partial: number;
-  unique: number;
-};
-
-export type SqliteIndexTermRow = {
-  cid: number;
-  coll: string;
-  desc: number;
-  key: number;
-  name: string | null;
-  seqno: number;
-};
-
 type SqliteIndexTermContract = Omit<SqliteIndexTermRow, "cid"> & {
   kind: "column" | "expression" | "rowid";
-};
-
-export type SqliteSchemaRow = {
-  name: string;
-  sql: string | null;
-  tbl_name?: string;
-};
-
-export type SqliteTableListRow = {
-  schema: string;
-  name: string;
-  strict: number;
-  wr: number;
 };
 
 export type SqliteIndexContract = {

@@ -5,21 +5,23 @@ import {
 } from "../state/postgres-schema.generated/sqlite-catalogs.js";
 import { executeWithCachedStatement } from "./kysely-sync-cache-state.js";
 import { runSqliteSchemaReadSnapshotSync } from "./sqlite-pinned-read-snapshot.js";
+import type {
+  SqliteColumnCatalog,
+  SqliteForeignKeyCatalog,
+  SqliteIndexListRow,
+  SqliteIndexTermRow,
+  SqliteSchemaCatalog,
+  SqliteSchemaRow,
+  SqliteSchemaSource,
+} from "./sqlite-schema-catalog-types.js";
 import {
-  readSqliteSchemaCatalog,
+  createSqliteTableContractReader,
+  type SqliteTableContractReader,
   sqliteSchemaContractFromCatalog,
-  type SqliteColumnCatalog,
-  type SqliteForeignKeyCatalog,
-  type SqliteSchemaCatalog,
-  type SqliteSchemaSource,
-  type SqliteViewCatalog,
 } from "./sqlite-schema-catalog.js";
 import {
   createSqliteIndexContract,
   type SqliteIndexContract,
-  type SqliteIndexListRow,
-  type SqliteIndexTermRow,
-  type SqliteSchemaRow,
   type SqliteTableContract,
   type SqliteTableDefinition,
 } from "./sqlite-schema-contract-assembly.js";
@@ -44,12 +46,11 @@ export type { SqliteSchemaCompatibility, SqliteSchemaIssue } from "./sqlite-sche
 
 type SqliteSchemaContract = ReadonlyMap<string, SqliteTableContract>;
 
-export type { SqliteSchemaSource } from "./sqlite-schema-catalog.js";
-
-export type SqliteTableContractReader = ((tableName: string) => SqliteTableContract | undefined) & {
-  readCatalog?: (viewNames: readonly string[]) => SqliteSchemaCatalog;
-  readView?: (viewName: string) => SqliteViewCatalog | undefined;
-};
+export type { SqliteSchemaSource } from "./sqlite-schema-catalog-types.js";
+export {
+  createSqliteTableContractReader,
+  type SqliteTableContractReader,
+} from "./sqlite-schema-catalog.js";
 
 export type CanonicalSqliteNamedIndexContract = {
   definition: string;
@@ -58,32 +59,6 @@ export type CanonicalSqliteNamedIndexContract = {
   tableName: string;
   unique: boolean;
 };
-
-/** Reuse actual catalog facts only within one unchanged read transaction on this connection. */
-export function createSqliteTableContractReader(
-  database: DatabaseSync,
-  viewNames: readonly string[] = [],
-) {
-  let catalog: SqliteSchemaCatalog | undefined;
-  let tables: SqliteSchemaContract | undefined;
-  const readCatalog = () => (catalog ??= readSqliteSchemaCatalog(database, { viewNames }));
-  return Object.assign(
-    (tableName: string) =>
-      (tables ??= sqliteSchemaContractFromCatalog(readCatalog())).get(tableName),
-    {
-      readCatalog: (expectedViewNames: readonly string[]) =>
-        expectedViewNames.every((name) => viewNames.includes(name))
-          ? readCatalog()
-          : readSqliteSchemaCatalog(database, { viewNames: expectedViewNames }),
-      readView: (viewName: string) => {
-        const views = viewNames.includes(viewName)
-          ? readCatalog().views
-          : readSqliteSchemaCatalog(database, { viewNames: [viewName] }).views;
-        return views.find((view) => view.name === viewName);
-      },
-    },
-  );
-}
 
 /**
  * Require every object from one committed schema while allowing unrelated
@@ -125,7 +100,14 @@ function collectSqliteSchemaIssuesInSnapshot(
   const expectedViewNames =
     descriptor?.viewNames ??
     getSqliteSchemaContract(schemaSql).catalog.views.map((view) => view.name);
-  const readActualTable = readTable ?? createSqliteTableContractReader(database, expectedViewNames);
+  const readActualTable =
+    readTable ??
+    createSqliteTableContractReader(
+      database,
+      expectedViewNames,
+      descriptor?.tableNames ??
+        getSqliteSchemaContract(schemaSql).catalog.tables.map((table) => table.name),
+    );
   if (hasCanonicalSqliteSchemaFingerprint(schemaSql, readActualTable, compatibility)) {
     return [];
   }
@@ -395,7 +377,7 @@ export function hasCanonicalSqliteSchemaFingerprint(
   if (!descriptor || !readTable.readCatalog) {
     return false;
   }
-  const catalog = readTable.readCatalog(descriptor.viewNames);
+  const catalog = readTable.readCatalog(descriptor.viewNames, descriptor.tableNames);
   if (fingerprintSqliteSchemaCatalog(catalog, descriptor) !== descriptor.fingerprint) {
     return false;
   }
