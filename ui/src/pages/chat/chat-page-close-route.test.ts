@@ -75,8 +75,7 @@ describe("chat page close navigation", () => {
     const { context } = createChatPageNavigationContext();
     const provider = createSolidApplicationContextProvider(context);
     const container = document.body.appendChild(createApplicationContextProvider(context));
-    const [route, setRoute] = createSignal<{ data: ChatRouteData; presented: boolean }>({
-      data: { kind: "session", sessionKey: firstKey, face: "chat" },
+    const [route, setRoute] = createSignal<{ data?: ChatRouteData; presented: boolean }>({
       presented: true,
     });
     const view = mountSolid(
@@ -91,6 +90,7 @@ describe("chat page close navigation", () => {
         }),
       { container, wrapper: provider.wrapper },
     );
+    setRoute({ data: { kind: "session", sessionKey: firstKey, face: "chat" }, presented: true });
     await Promise.resolve();
     flush();
     const page = expectDefined(
@@ -98,6 +98,9 @@ describe("chat page close navigation", () => {
       "mounted route page",
     );
     await settleChatPage(page);
+    expect(
+      [...page.querySelectorAll<RenderedPane>("openclaw-chat-pane")].map((pane) => pane.sessionKey),
+    ).toEqual([firstKey]);
     const firstPane = expectDefined(
       page.querySelector<RenderedPane>("openclaw-chat-pane"),
       "first route pane",

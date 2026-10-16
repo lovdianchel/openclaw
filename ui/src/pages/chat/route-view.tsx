@@ -2,7 +2,9 @@ import type { RouteMatch } from "@openclaw/uirouter";
 import { For, Match, Switch } from "solid-js";
 import { PanelErrorState } from "../../components/solid/lazy-view-error.tsx";
 import { t } from "../../lib/reactive/i18n.ts";
-import { ChatPageView } from "./chat-page.ts";
+import type { ElementProperties } from "../../types/solid-elements.d.ts";
+import type { ChatPageProps } from "./chat-page-types.ts";
+import "./chat-page.ts";
 import type { ChatRouteData } from "./route-loader.ts";
 
 const CHAT_PAGE_OWNER_KEY = "chat-page";
@@ -93,10 +95,21 @@ export function ChatRouteView(props: { data?: unknown; presented?: boolean }) {
         )}
       </Match>
       <Match when={session()}>
-        {(data) => <ChatPageView data={data()} presented={props.presented !== false} />}
+        {(data) => (
+          <openclaw-chat-page prop:data={data()} prop:presented={props.presented !== false} />
+        )}
       </Match>
     </Switch>
   );
+}
+
+declare module "@solidjs/web" {
+  namespace JSX {
+    interface IntrinsicElements {
+      "openclaw-chat-page": HTMLAttributes<HTMLElement> &
+        ElementProperties<Pick<ChatPageProps, "data" | "presented">>;
+    }
+  }
 }
 
 export function sessionRenderOwnerKey(
