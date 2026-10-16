@@ -47,9 +47,11 @@ beforeAll(async () => {
     // Preserve lazy runtime imports so unused provider SDKs do not consume the child heap.
     outputOptions: { codeSplitting: true },
     deps: {
-      alwaysBundle: Object.entries(packageJson.dependencies)
-        .filter(([, version]) => version.startsWith("workspace:"))
-        .map(([name]) => name),
+      alwaysBundle: (id) =>
+        Object.entries(packageJson.dependencies).some(
+          ([name, version]) =>
+            version.startsWith("workspace:") && (id === name || id.startsWith(`${name}/`)),
+        ),
       neverBundle: Object.entries(packageJson.dependencies)
         .filter(([, version]) => !version.startsWith("workspace:"))
         .map(([name]) => name),
