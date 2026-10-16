@@ -1,8 +1,9 @@
 import { asNullableRecord as asConfigRecord } from "@openclaw/normalization-core/record-coerce";
 import { createMemo, For, Match, onCleanup, Switch, untrack } from "solid-js";
-import { renderProviderBrandIcon, providerIdFromModelRef } from "../../components/provider-icon.ts";
+import { providerIdFromModelRef } from "../../components/provider-icon-data.ts";
 import "../../components/select-picker.ts";
 import type { PickerParams } from "../../components/select-picker.ts";
+import { ProviderBrandIcon } from "../../components/solid/provider-icon.tsx";
 import {
   LearnMoreLink,
   SettingsDefaultDescription,
@@ -245,11 +246,10 @@ function CuratedModelPicker(props: CuratedModelPickerProps) {
     searchable: true,
     showOptionTooltips: false,
     className: "model-picker__select ",
-    // The retained picker owns and renders its Lit option adornments.
     renderLeading: (option) =>
-      option.provider
-        ? renderProviderBrandIcon(option.provider, { className: "model-picker__provider-icon" })
-        : undefined,
+      option.provider ? (
+        <ProviderBrandIcon provider={option.provider} class="model-picker__provider-icon" />
+      ) : undefined,
     onChange: props.onChange,
     onChangeTarget: (value) => {
       if (value === customValue()) {

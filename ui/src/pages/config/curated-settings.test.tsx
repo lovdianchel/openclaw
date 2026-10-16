@@ -142,7 +142,14 @@ describe("plugin-owned Dreaming settings presentation", () => {
     expect(onPatch).toHaveBeenCalledWith(["model"], undefined);
 
     const inherited = renderInto({ execution: { defaults: { model: "openai/gpt-5.6" } } });
-    expect(rowFor(inherited, "Dreaming model").textContent).not.toContain("Using default:");
+    await updatePickers(inherited);
+    const inheritedRow = rowFor(inherited, "Dreaming model");
+    expect(inheritedRow.textContent).not.toContain("Using default:");
+    const trigger = inheritedRow.querySelector<HTMLButtonElement>(".picker-select__trigger");
+    expect(trigger).not.toBeNull();
+    trigger!.click();
+    await updatePickers(inherited);
+    expect(inheritedRow.querySelector("[data-provider-icon=codex]")).not.toBeNull();
   });
 
   it("locks every global dreaming control when config mutation is unavailable", () => {
