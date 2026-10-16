@@ -1213,73 +1213,78 @@ describe("runCliAgent reliability", () => {
     },
   );
 
-  it("returns accepted CLI session spawns when sessions_yield pauses the requester", async () => {
-    const { dir, sessionFile, sessionTarget, storePath } = createSessionFixture();
-    const requesterTurnRunId = "run-cli-yield";
-    const childRunId = "run-cli-child";
-    const childSessionKey = "agent:main:subagent:cli-child";
-    supervisorSpawnMock.mockImplementationOnce(async (...args: unknown[]) => {
-      const input = args[0] as Parameters<ReturnType<typeof getProcessSupervisor>["spawn"]>[0];
-      completeCapturedToolCall(
-        {
-          captureKey: input.env?.OPENCLAW_MCP_CLI_CAPTURE_KEY,
-          toolName: "sessions_spawn",
-          args: { task: "review" },
-        },
-        {
-          details: {
-            status: "accepted",
-            runId: childRunId,
-            childSessionKey,
-            expectsCompletionMessage: true,
+  it.each(["telegram", "webchat"])(
+    "returns accepted CLI session spawns when sessions_yield pauses the %s requester",
+    async (messageChannel) => {
+      const { dir, sessionFile, sessionTarget, storePath } = createSessionFixture();
+      const requesterTurnRunId = "run-cli-yield";
+      const childRunId = "run-cli-child";
+      const childSessionKey = "agent:main:subagent:cli-child";
+      supervisorSpawnMock.mockImplementationOnce(async (...args: unknown[]) => {
+        const input = args[0] as Parameters<ReturnType<typeof getProcessSupervisor>["spawn"]>[0];
+        completeCapturedToolCall(
+          {
+            captureKey: input.env?.OPENCLAW_MCP_CLI_CAPTURE_KEY,
+            toolName: "sessions_spawn",
+            args: { task: "review" },
+          },
+          {
+            details: {
+              status: "accepted",
+              runId: childRunId,
+              childSessionKey,
+              expectsCompletionMessage: true,
+            },
+          },
+        );
+        const captureHandle = markMcpLoopbackRequestStarted(
+          input.env?.OPENCLAW_MCP_CLI_CAPTURE_KEY,
+        );
+        await resolveMcpLoopbackYieldContext(captureHandle)?.onYield("waiting on subagents");
+        markMcpLoopbackRequestFinished(captureHandle);
+        input.onStdout?.(SILENT_REPLY_TOKEN);
+        return makeManagedRun();
+      });
+      const context = buildPreparedContext({
+        sessionKey: "agent:main:main",
+        runId: requesterTurnRunId,
+      });
+      context.mcpDeliveryCapture = true;
+      Object.assign(context.params, {
+        messageChannel,
+        sessionFile,
+        sessionTarget,
+        storePath,
+        workspaceDir: dir,
+        persistAssistantTranscript: true,
+      });
+
+      const result = await runPreparedCliAgent(context);
+
+      expect(result).toMatchObject({
+        acceptedSessionSpawns: [
+          { runId: childRunId, childSessionKey, expectsCompletionMessage: true },
+        ],
+        meta: {
+          yielded: true,
+          livenessState: "paused",
+          stopReason: "end_turn",
+          completion: {
+            finishReason: "end_turn",
+            stopReason: "end_turn",
+            refusal: false,
           },
         },
-      );
-      const captureHandle = markMcpLoopbackRequestStarted(input.env?.OPENCLAW_MCP_CLI_CAPTURE_KEY);
-      await resolveMcpLoopbackYieldContext(captureHandle)?.onYield("waiting on subagents");
-      markMcpLoopbackRequestFinished(captureHandle);
-      input.onStdout?.(SILENT_REPLY_TOKEN);
-      return makeManagedRun();
-    });
-    const context = buildPreparedContext({
-      sessionKey: "agent:main:main",
-      runId: requesterTurnRunId,
-    });
-    context.mcpDeliveryCapture = true;
-    Object.assign(context.params, {
-      messageChannel: "telegram",
-      sessionFile,
-      sessionTarget,
-      storePath,
-      workspaceDir: dir,
-      persistAssistantTranscript: true,
-    });
-
-    const result = await runPreparedCliAgent(context);
-
-    expect(result).toMatchObject({
-      acceptedSessionSpawns: [
-        { runId: childRunId, childSessionKey, expectsCompletionMessage: true },
-      ],
-      meta: {
-        yielded: true,
-        livenessState: "paused",
-        stopReason: "end_turn",
-        completion: {
-          finishReason: "end_turn",
-          stopReason: "end_turn",
-          refusal: false,
-        },
-      },
-    });
-    const messages = await readTranscriptMessages(sessionTarget);
-    expect(messages).toMatchObject([
-      { role: "assistant", content: [{ type: "text", text: SILENT_REPLY_TOKEN }] },
-    ]);
-    expect(result.payloads).toBeUndefined();
-    expect(result.meta.terminalReply).toEqual({ disposition: "silent" });
-    expect(result.meta.finalAssistantRawText).toBe(SILENT_REPLY_TOKEN);
-  });
+      });
+      const messages = await readTranscriptMessages(sessionTarget);
+      expect(messages).toMatchObject([
+        { role: "assistant", content: [{ type: "text", text: SILENT_REPLY_TOKEN }] },
+      ]);
+      expect(result.payloads).toBeUndefined();
+      expect(result.meta.terminalReply).toEqual({ disposition: "silent" });
+      expect(result.meta.finalAssistantRawText).toBe(SILENT_REPLY_TOKEN);
+    },
+  );
 
   it("keeps raw assistant output separate from transformed visible CLI output", async () => {
     supervisorSpawnMock.mockResolvedValueOnce(makeManagedRun({ stdout: "hello from cli" }));
@@ -1813,6 +1818,7 @@ describe("runCliAgent reliability", () => {
     { text: SILENT_REPLY_TOKEN, expectation: "optional", disposition: "silent" },
     { text: "   ", expectation: "required", disposition: undefined },
     { text: "   ", expectation: "result-required", disposition: undefined },
+    { text: SILENT_REPLY_TOKEN, expectation: "result-required", disposition: undefined },
   ] as const)(
     "settles $expectation CLI output $text according to its reply obligation",
     async ({ text, expectation, disposition }) => {

@@ -378,6 +378,7 @@ async function runPreparedCliAgentOwned(
     const replyExpectation = resolveReplyExpectation(params);
     if (
       !output.terminalInterruption &&
+      !output.yielded &&
       ((replyExpectation === "result-required" &&
         !params.controlOperation &&
         !(isolatedCompletion && params.outputTextPolicy === "strict-visible") &&
@@ -388,7 +389,6 @@ async function runPreparedCliAgentOwned(
           !params.controlOperation &&
           resolveSourceReplyDelivery(output) === "missing" &&
           !output.toolMediaUrls?.length &&
-          !output.yielded &&
           !hasCompletionMessageSessionSpawn(output.acceptedSessionSpawns) &&
           // Strict isolated completion owns valid-empty output after reasoning is removed.
           !(isolatedCompletion && params.outputTextPolicy === "strict-visible")))
