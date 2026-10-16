@@ -47,7 +47,10 @@ import {
   selectAttachmentMenuOption,
   selectFile,
 } from "./chat-attachment-picker.test-support.ts";
-import { createComposerContainer } from "./chat-composer.test-support.ts";
+import {
+  createComposerContainer,
+  createComposerControlsFixture,
+} from "./chat-composer.test-support.ts";
 import { makeChatHost } from "./chat-host.test-support.ts";
 import { createChatModelSetupBanner } from "./chat-model-setup.ts";
 import { applyChatPendingInputs, getChatPendingInputs } from "./chat-pending-inputs.ts";
@@ -1898,9 +1901,7 @@ describe("chat loading skeleton", () => {
   it("shows prompt-bar progress beside context usage while the current session send is awaiting acknowledgement", () => {
     const container = renderChatView({
       sending: true,
-      composerControls: html`<button class="chat-composer-model-control" type="button">
-        Model
-      </button>`,
+      composerControls: createComposerControlsFixture(),
       queue: [createPendingSend()],
       selectedSession: createContextUsageSessions().sessions[0],
     });
@@ -2033,9 +2034,7 @@ describe("chat loading skeleton", () => {
     try {
       const container = renderChatView({
         messages: [{ role: "assistant", content: "Partial response" }],
-        composerControls: html`<button class="chat-composer-model-control" type="button">
-          Model
-        </button>`,
+        composerControls: createComposerControlsFixture(),
         runStatus: {
           phase: "interrupted",
           runId: "run-1",
