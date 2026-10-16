@@ -9,6 +9,7 @@ import {
   type ChatPaneHeaderPresentation,
 } from "./chat-pane-header.tsx";
 import type { ChatSessionSharingProps } from "./chat-session-sharing.solid.tsx";
+import "./chat-header-session-menu.ts";
 
 export type ChatPaneHeaderProps = Parameters<typeof ChatPaneHeader>[0];
 
