@@ -1,5 +1,4 @@
 /* @vitest-environment jsdom */
-import { ContextEvent } from "@lit/context";
 import { gatewayCredentialScope } from "@openclaw/gateway-client/browser";
 import { expectDefined } from "@openclaw/normalization-core";
 import { html, render as renderLit } from "lit";
@@ -327,20 +326,34 @@ describe("warm boot app root", () => {
     expect(loginGate(second.container).props.showGatewaySecret).toBe(false);
   });
 
-  it("provides the same ApplicationContext to Lit descendants and retires it on disposal", async () => {
+  it("provides the same ApplicationContext to native descendants and retires it on disposal", async () => {
     const { container } = await createWarmSurface();
     await vi.dynamicImportSettled();
     await settleRootContent();
     const descendant = document.createElement("span");
     container.querySelector("openclaw-app-shell")!.append(descendant);
     const received = vi.fn();
-    descendant.dispatchEvent(new ContextEvent(applicationContext, descendant, received, true));
+    descendant.dispatchEvent(
+      Object.assign(new Event("context-request", { bubbles: true, composed: true }), {
+        context: applicationContext,
+        contextTarget: descendant,
+        callback: received,
+        subscribe: true,
+      }),
+    );
     expect(received.mock.calls[0]?.[0]).toBe(runtime!.context);
     dispose?.();
     dispose = undefined;
     received.mockClear();
     container.append(descendant);
-    descendant.dispatchEvent(new ContextEvent(applicationContext, descendant, received, true));
+    descendant.dispatchEvent(
+      Object.assign(new Event("context-request", { bubbles: true, composed: true }), {
+        context: applicationContext,
+        contextTarget: descendant,
+        callback: received,
+        subscribe: true,
+      }),
+    );
     expect(received).not.toHaveBeenCalled();
   });
 

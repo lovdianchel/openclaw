@@ -3,18 +3,19 @@
 import { createRouter, definePage } from "@openclaw/uirouter";
 import { render } from "@solidjs/testing-library";
 import { flush } from "solid-js";
+import { createComponent } from "solid-js";
 import { expect, it, onTestFinished, vi } from "vitest";
 import type { ControlUiHost, ControlUiReplacement } from "../../../src/plugin-sdk/control-ui.js";
 import { GatewayBrowserClient } from "../api/gateway.ts";
+import { ApplicationProvider } from "../lib/reactive/context.ts";
 import type { SolidBridgeElement } from "../lit/solid-bridge.ts";
+import "../plugins/control-ui-view.solid.tsx";
 import type { ChatRouteData } from "../pages/chat/session-route-data.ts";
 import type { ControlUiRegistration } from "../plugins/control-ui-capability.ts";
-import "../plugins/control-ui-view.solid.tsx";
 import { setupSidebarTest } from "../test-helpers/app-sidebar-setup.ts";
 import { settleLitElement } from "../test-helpers/lit-settle.ts";
 import { equalShellRouteState, selectShellRouteState } from "./app-host-route-state.ts";
 import { ShellOwner } from "./app-host.tsx";
-import { connectLegacyApplicationContext } from "./app-root-lit.ts";
 import { renderApplicationShell } from "./app-shell-view.tsx";
 import { bootstrapApplication } from "./bootstrap.ts";
 
@@ -24,14 +25,22 @@ async function mountShell() {
   const runtime = bootstrapApplication();
   const owner = new ShellOwner(document.createElement("openclaw-app-shell"), runtime);
   owner.routeState = { routeId: "chat" };
-  const disconnectContext = connectLegacyApplicationContext(owner.element, runtime.context);
   document.body.append(owner.element);
-  const view = render(() => renderApplicationShell(owner), {
-    container: owner.element,
-  });
+  const view = render(
+    () =>
+      createComponent(ApplicationProvider, {
+        host: owner.element,
+        value: runtime.context,
+        get children() {
+          return renderApplicationShell(owner);
+        },
+      }),
+    {
+      container: owner.element,
+    },
+  );
   onTestFinished(() => {
     view.unmount();
-    disconnectContext();
     owner.disconnect();
     runtime.stop();
   });
