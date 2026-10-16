@@ -7,10 +7,7 @@ import {
 import { sessionParticipantsSchemaSql } from "./openclaw-agent-session-participants-schema.js";
 import { tableExists, tableHasColumn } from "./openclaw-state-db-schema-helpers.js";
 
-export {
-  LEGACY_PARTICIPANT_OPTIONAL_COLUMNS,
-  withLegacySessionParticipantsSchema,
-} from "./openclaw-agent-schema-history.js";
+export { LEGACY_PARTICIPANT_OPTIONAL_COLUMNS } from "./openclaw-agent-schema-history.js";
 
 const MIGRATION_TABLE = "session_participants_identity_migration";
 export function migrateSessionParticipantsSchema(database: DatabaseSync, pathname: string): void {

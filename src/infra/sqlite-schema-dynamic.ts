@@ -9,7 +9,7 @@ import {
 } from "./sqlite-schema-contract.js";
 
 /** Memory migrations accept caller-selected table identifiers, so their catalogs cannot be generated. */
-export function buildDynamicSqliteSchemaCatalog(schemaSql: string): SqliteSchemaCatalog {
+function buildDynamicSqliteSchemaCatalog(schemaSql: string): SqliteSchemaCatalog {
   const database = openNodeSqliteDatabase(":memory:");
   try {
     database.exec(schemaSql);

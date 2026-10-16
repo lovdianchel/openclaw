@@ -7,7 +7,6 @@ import { tableExists } from "./openclaw-state-db-schema-helpers.js";
 
 export {
   AGENT_PROGRESS_CARD_SCHEMA_SQL,
-  AGENT_SCHEMA_WITHOUT_PROGRESS_CARD_SQL,
   SESSION_PROGRESS_CARDS_TABLE,
 } from "./openclaw-agent-schema-history.js";
 

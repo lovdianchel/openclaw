@@ -115,6 +115,10 @@ export function sqliteSchemaContractFromCatalog(
 type CatalogObject = SqliteSchemaRow & { type: string; tbl_name: string };
 type IndexRow = SqliteIndexListRow & { table_name: string; index_seq: number };
 type IndexTermRow = SqliteIndexTermRow & { table_name: string; index_seq: number };
+type IndexFactsRow = Omit<IndexRow, "name"> & { index_name: string } & (
+    | SqliteIndexTermRow
+    | { [Key in keyof SqliteIndexTermRow]: null }
+  );
 type ColumnRow = SqliteColumnCatalog & { table_name: string };
 type ForeignKeyRow = SqliteForeignKeyCatalog & { table_name: string };
 
@@ -132,7 +136,7 @@ function groupRows<Row, Key extends string | number>(
   return groups;
 }
 
-/** Read one native catalog in six statements, independent of its table count. */
+/** Read one native catalog in five statements, independent of its table count. */
 export function readSqliteSchemaCatalog(
   database: DatabaseSync,
   options: { viewNames?: readonly string[]; virtualTableNames?: readonly string[] } = {},
@@ -172,38 +176,53 @@ export function readSqliteSchemaCatalog(
       "pragma_foreign_key_list",
     ].includes(row.name.toLowerCase()),
   );
-  const indexes = shadowed
-    ? undefined
-    : groupRows(
-        database
-          .prepare(`
-          SELECT t.name AS table_name, i.seq AS index_seq,
-            i.name, i.origin, i.partial, i."unique"
-          FROM main.sqlite_schema AS t
-          CROSS JOIN pragma_index_list(t.name, 'main') AS i
-          WHERE t.type = 'table' AND substr(t.name, 1, 7) <> 'sqlite_'
-        `)
-          // SAFETY: Unshadowed index_list provides the selected string names/origin and integer flags/seq.
-          .all() as IndexRow[],
-        (row) => row.table_name,
-      );
-  const terms = shadowed
-    ? undefined
-    : groupRows(
-        database
-          .prepare(`
-          SELECT t.name AS table_name, i.seq AS index_seq,
-            x.seqno, x.cid, x.name, x."desc", x.coll, x."key"
-          FROM main.sqlite_schema AS t
-          CROSS JOIN pragma_index_list(t.name, 'main') AS i
-          CROSS JOIN pragma_index_xinfo(i.name, 'main') AS x
-          WHERE t.type = 'table' AND substr(t.name, 1, 7) <> 'sqlite_'
-          ORDER BY t.name, i.seq, x.seqno
-        `)
-          // SAFETY: Unshadowed index_xinfo provides fixed string/null term fields and integer flags/positions.
-          .all() as IndexTermRow[],
-        (row) => row.table_name,
-      );
+  let indexes: Map<string, IndexRow[]> | undefined;
+  let terms: Map<string, IndexTermRow[]> | undefined;
+  if (!shadowed) {
+    indexes = new Map();
+    terms = new Map();
+    const rows = database
+      .prepare(`
+        SELECT t.name AS table_name, i.seq AS index_seq,
+          i.name AS index_name, i.origin, i.partial, i."unique",
+          x.seqno, x.cid, x.name, x."desc", x.coll, x."key"
+        FROM main.sqlite_schema AS t
+        CROSS JOIN pragma_index_list(t.name, 'main') AS i
+        LEFT JOIN pragma_index_xinfo(i.name, 'main') AS x ON 1 = 1
+        WHERE t.type = 'table' AND substr(t.name, 1, 7) <> 'sqlite_'
+        ORDER BY t.name, i.seq, x.seqno
+      `)
+      // SAFETY: Unshadowed native PRAGMAs have fixed field types; absent LEFT JOIN terms are all null.
+      .all() as IndexFactsRow[];
+    for (const row of rows) {
+      const tableIndexes = indexes.get(row.table_name) ?? [];
+      if (tableIndexes.at(-1)?.index_seq !== row.index_seq) {
+        tableIndexes.push({
+          table_name: row.table_name,
+          index_seq: row.index_seq,
+          name: row.index_name,
+          origin: row.origin,
+          partial: row.partial,
+          unique: row.unique,
+        });
+        indexes.set(row.table_name, tableIndexes);
+      }
+      if (row.seqno !== null) {
+        const tableTerms = terms.get(row.table_name) ?? [];
+        tableTerms.push({
+          table_name: row.table_name,
+          index_seq: row.index_seq,
+          seqno: row.seqno,
+          cid: row.cid,
+          name: row.name,
+          desc: row.desc,
+          coll: row.coll,
+          key: row.key,
+        });
+        terms.set(row.table_name, tableTerms);
+      }
+    }
+  }
   // Unrelated views may reference removed tables; only declared views need column inspection.
   const columnObjectClause = !options.viewNames
     ? "t.type IN ('table', 'view')"

@@ -175,7 +175,7 @@ export function canonicalSessionValidationSchemaSql(schema = OPENCLAW_AGENT_SCHE
 }
 
 /** Historical migration preflights cannot require the schema-21 validation projection. */
-export function withoutCanonicalSessionValidationSchema(schema: string): string {
+function withoutCanonicalSessionValidationSchema(schema: string): string {
   if (!schema.includes("CREATE TABLE IF NOT EXISTS session_canonical_validation_pending (")) {
     return schema;
   }
@@ -244,7 +244,7 @@ export function sessionParticipantsSchemaSql(): string {
 }
 
 /** Historical structural/media validation must not require a future identity key. */
-export function withLegacySessionParticipantsSchema(sql: string): string {
+function withLegacySessionParticipantsSchema(sql: string): string {
   return withoutCanonicalSessionValidationSchema(sql).replace(
     sessionParticipantsSchemaSql().trim(),
     LEGACY_PARTICIPANTS_SCHEMA,
@@ -327,8 +327,10 @@ export const AGENT_PROGRESS_CARD_SCHEMA_SQL = extractSqliteTableSchema(
     errorMessage: "OpenClaw agent progress-card schema markers are missing.",
   },
 );
-export const AGENT_SCHEMA_WITHOUT_PROGRESS_CARD_SQL =
-  OPENCLAW_AGENT_SCHEMA_WITHOUT_BOARD_SQL.replace(AGENT_PROGRESS_CARD_SCHEMA_SQL, "");
+const AGENT_SCHEMA_WITHOUT_PROGRESS_CARD_SQL = OPENCLAW_AGENT_SCHEMA_WITHOUT_BOARD_SQL.replace(
+  AGENT_PROGRESS_CARD_SCHEMA_SQL,
+  "",
+);
 
 const SUGGESTIONS_SCHEMA_START = "CREATE TABLE IF NOT EXISTS session_suggestions (";
 

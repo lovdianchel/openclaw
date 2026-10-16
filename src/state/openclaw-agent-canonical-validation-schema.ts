@@ -9,10 +9,7 @@ import { resolveGlobalSingleton } from "../shared/global-singleton.js";
 import { classifyOpenClawAgentDatabaseReadError } from "./openclaw-agent-db-read-error.js";
 import { OPENCLAW_AGENT_SCHEMA_SQL } from "./openclaw-agent-schema.js";
 
-export {
-  canonicalSessionValidationSchemaSql,
-  withoutCanonicalSessionValidationSchema,
-} from "./openclaw-agent-schema-history.js";
+export { canonicalSessionValidationSchemaSql } from "./openclaw-agent-schema-history.js";
 
 const validationTables = new Set([
   "session_nodes",

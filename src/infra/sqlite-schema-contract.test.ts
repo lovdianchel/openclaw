@@ -178,7 +178,7 @@ describe("assertSqliteSchemaContains", () => {
     }
   });
 
-  it("compares the real agent schema with six catalog reads and detects drift", () => {
+  it("compares the real agent schema with five catalog reads and detects drift", () => {
     const schema = readFileSync(
       new URL("../state/openclaw-agent-schema.sql", import.meta.url),
       "utf8",
@@ -192,8 +192,8 @@ describe("assertSqliteSchemaContains", () => {
       const inspect = () => {
         reads.clear();
         const issues = collectSqliteSchemaIssues(database, schema);
-        // Six metadata queries plus the PRAGMA that pins the read snapshot.
-        expect(reads.count()).toBe(7);
+        // Five metadata queries plus the PRAGMA that pins the read snapshot.
+        expect(reads.count()).toBe(6);
         return issues.map(({ code, objectName }) => ({ code, objectName }));
       };
       try {

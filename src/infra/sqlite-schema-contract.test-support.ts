@@ -1,10 +1,11 @@
+import { openNodeSqliteDatabase } from "./node-sqlite.js";
 import type { SqliteSchemaCatalog, SqliteSchemaSource } from "./sqlite-schema-catalog-types.js";
+import { readSqliteSchemaCatalog } from "./sqlite-schema-catalog.js";
 import {
   assertSqliteSchemaContains as assertContains,
   assertSqliteSchemaTablesPresent as assertTablesPresent,
   collectSqliteSchemaIssues as collectIssues,
 } from "./sqlite-schema-contract.js";
-import { buildDynamicSqliteSchemaCatalog } from "./sqlite-schema-dynamic.js";
 
 const fixtures = new Map<string, SqliteSchemaCatalog>();
 
@@ -15,8 +16,14 @@ export function sqliteSchemaFixture(source: SqliteSchemaSource): SqliteSchemaCat
   }
   let catalog = fixtures.get(source);
   if (!catalog) {
-    catalog = buildDynamicSqliteSchemaCatalog(source);
-    fixtures.set(source, catalog);
+    const database = openNodeSqliteDatabase(":memory:");
+    try {
+      database.exec(source);
+      catalog = readSqliteSchemaCatalog(database);
+      fixtures.set(source, catalog);
+    } finally {
+      database.close();
+    }
   }
   return catalog;
 }
