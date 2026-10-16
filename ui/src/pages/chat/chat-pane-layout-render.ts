@@ -25,7 +25,6 @@ import {
   PaneOutboxRecovery,
   PanePrimary,
   PaneSubagentHeader,
-  PaneSubagentStop,
 } from "./chat-pane-layout-view.tsx";
 import { resolveChatPaneDesktopTarget } from "./chat-pane-placement.ts";
 import type { createChatPaneRails } from "./chat-pane-rails.ts";
@@ -204,8 +203,8 @@ export abstract class ChatPaneLayoutRender extends ChatPaneBrowserAnnotationRend
       chatProps.canAbort &&
       chatProps.onAbort &&
       !hasTerminalRunStatus(chatProps.runStatus)
-        ? solidContent(PaneSubagentStop, { onAbort: chatProps.onAbort })
-        : emptyLegacyContent;
+        ? { onAbort: chatProps.onAbort }
+        : undefined;
     const subagentHeader = this.onBackToSubagents
       ? solidContent(PaneSubagentHeader, {
           onBack: this.onBackToSubagents,
