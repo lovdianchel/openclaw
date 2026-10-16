@@ -1372,7 +1372,18 @@ describe("subagent registry lifecycle hardening", () => {
     "keeps provider success canonical while a %s callback waits behind capture",
     async (source) => {
       const { entry, controller, captured, captureSubagentCompletionReply } = createCaptureFixture(
-        createRunEntry({ expectsCompletionMessage: false }),
+        createRunEntry({
+          expectsCompletionMessage: false,
+          execution: {
+            status: "running",
+            transcriptTarget: {
+              agentId: "main",
+              sessionId: "session-id",
+              sessionKey: "agent:main:subagent:child",
+              storePath: "/tmp/openclaw-agent.sqlite",
+            },
+          },
+        }),
       );
       const success = completeRun(controller, entry, { terminalReply: undefined });
       await waitForLifecycleState(() =>
@@ -2726,7 +2737,9 @@ describe("subagent registry lifecycle hardening", () => {
     await waitForLifecycleState(() =>
       expect(readLifecycleRun(entry).cleanupCompletedAt).toBeTypeOf("number"),
     );
-    expect(readLifecycleRun(entry).completion?.resultText).toBe("raw collector result");
+    expect(loadSubagentRegistryFromSqlite().get(entry.runId)?.completion?.resultText).toBe(
+      "raw collector result",
+    );
     expect(readLifecycleRun(entry).collectorCompletion).toEqual({ status: "done" });
     expect(readLifecycleRun(entry).delivery?.status).toBe("not_required");
     expect(readLifecycleRun(entry).delivery?.announcedAt).toBeUndefined();
