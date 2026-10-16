@@ -92,16 +92,38 @@ suite.define(() => {
           current.locator(".chat-pane__branch-copy"),
           current.locator(".chat-pane__branch-active svg"),
         ]);
-        const infoIconBox = await info.locator("svg").boundingBox();
+        // Header updates can replace branch details; measure one rendered menu state.
+        const { infoIconBox, headline, textBox, checkBox, checkIconBox } =
+          await menuSurface.evaluate((surface) => {
+            const activeBranch = surface.querySelector(
+              '.chat-pane__branch-item[data-active="true"]',
+            );
+            const bounds = (element: Element | null) => {
+              if (
+                !element ||
+                !element.checkVisibility({ visibilityProperty: true }) ||
+                element.getClientRects().length === 0
+              ) {
+                return null;
+              }
+              const { x, y, width, height } = element.getBoundingClientRect();
+              return { x, y, width, height };
+            };
+            return {
+              infoIconBox: bounds(surface.querySelector(".chat-pane__versions-info svg")),
+              headline:
+                activeBranch?.querySelector(".chat-pane__branch-headline")?.textContent ?? null,
+              textBox: bounds(activeBranch?.querySelector(".chat-pane__branch-copy") ?? null),
+              checkBox: bounds(activeBranch?.querySelector(".chat-pane__branch-active") ?? null),
+              checkIconBox: bounds(
+                activeBranch?.querySelector(".chat-pane__branch-active svg") ?? null,
+              ),
+            };
+          });
         expect(infoIconBox).not.toBeNull();
-        expect(await current.locator(".chat-pane__branch-headline").textContent()).toBe(
-          "A simpler way to stay organized",
-        );
-        const textBox = await current.locator(".chat-pane__branch-copy").boundingBox();
-        const checkBox = await current.locator(".chat-pane__branch-active").boundingBox();
+        expect(headline).toBe("A simpler way to stay organized");
         expect(textBox).not.toBeNull();
         expect(checkBox).not.toBeNull();
-        const checkIconBox = await current.locator(".chat-pane__branch-active svg").boundingBox();
         expect(checkIconBox).not.toBeNull();
         expect(
           Math.abs(
