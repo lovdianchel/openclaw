@@ -6,12 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import { resetChatViewState } from "../chat-view-state.ts";
 import type { SidebarFullMessageLoader } from "./chat-sidebar-content-types.ts";
-import {
-  renderTranscriptSearch,
-  toggleTranscriptSearch,
-  type ChatThreadProps,
-} from "./chat-thread-interactions.ts";
-import { renderChatThread } from "./chat-thread.test-support.ts";
+import { toggleTranscriptSearch, type ChatThreadProps } from "./chat-thread-interactions.ts";
+import { renderChatThread, mountTranscriptSearch } from "./chat-thread.test-support.ts";
 import { ChatTranscriptController } from "./chat-transcript-controller.ts";
 import {
   flushDeferredRowPrune,
@@ -42,10 +38,16 @@ class RecoveryTranscriptElement extends LitElement {
     return this;
   }
 
+  private readonly search = mountTranscriptSearch(
+    () => this.props.paneId,
+    () => this.requestUpdate(),
+  );
+
   override render() {
     const requestUpdate = () => this.requestUpdate();
+    this.search.update();
     return html`
-      ${renderTranscriptSearch(this.props.paneId, requestUpdate)}
+      ${this.search.container}
       ${renderChatThread({ ...this.props, onRequestUpdate: requestUpdate }, this.transcript)}
     `;
   }

@@ -489,6 +489,7 @@ export function PluginSurface<S extends ControlUiSurface>(props: {
   return (
     <Show when={selected()} fallback={<DefaultView />}>
       <PluginView
+        data-plugin-composer={props.surface === "composer" ? "" : undefined}
         surface={props.surface}
         props={props.props}
         presented={presented()}

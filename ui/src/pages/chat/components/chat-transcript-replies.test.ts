@@ -7,12 +7,8 @@ import { flush } from "../../../test-helpers/solid-settle.ts";
 import { createTestTranscript, stubAnimationFrames } from "../chat-view.test-helpers.ts";
 import { projectChatTranscriptMetadata } from "../session-message-cache.ts";
 import * as chatMessage from "./chat-message-group.test-support.ts";
-import {
-  getTranscriptState,
-  renderTranscriptSearch,
-  toggleTranscriptSearch,
-} from "./chat-thread-interactions.ts";
-import { renderChatThread } from "./chat-thread.test-support.ts";
+import { getTranscriptState, toggleTranscriptSearch } from "./chat-thread-interactions.ts";
+import { renderChatThread, mountTranscriptSearch } from "./chat-thread.test-support.ts";
 import {
   flushDeferredRowPrune,
   installTranscriptDomMocks,
@@ -492,13 +488,14 @@ describe("chat transcript replies", () => {
     }
     const requestUpdate = () => queueMicrotask(rerender);
     const rerender = () => {
-      render(renderTranscriptSearch(paneId, requestUpdate), searchContainer);
+      searchView.update();
       render(
         renderChatThread({ ...props, onRequestUpdate: requestUpdate }, transcript),
         threadContainer,
       );
       transcript.hostUpdated();
     };
+    const searchView = mountTranscriptSearch(() => paneId, requestUpdate, searchContainer);
     try {
       toggleTranscriptSearch(paneId, requestUpdate);
       rerender();

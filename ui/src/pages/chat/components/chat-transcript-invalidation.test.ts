@@ -23,12 +23,8 @@ import { createTestTranscript } from "../chat-view.test-helpers.ts";
 import { saveChatSessionScrollPosition } from "../scroll.ts";
 import * as chatMessage from "./chat-message-group-frame.ts";
 import { releaseChatMediaResourceSubscriber } from "./chat-message-media.ts";
-import {
-  renderTranscriptSearch,
-  resetTranscriptSession,
-  toggleTranscriptSearch,
-} from "./chat-thread-interactions.ts";
-import { renderChatThread } from "./chat-thread.test-support.ts";
+import { resetTranscriptSession, toggleTranscriptSearch } from "./chat-thread-interactions.ts";
+import { renderChatThread, mountTranscriptSearch } from "./chat-thread.test-support.ts";
 import { settleToolBridges } from "./chat-tool-render.test-support.ts";
 import { projectChatTranscript } from "./chat-transcript-projection.ts";
 import {
@@ -130,10 +126,11 @@ describe("chat transcript invalidation", () => {
       const container = document.body.appendChild(document.createElement("div"));
       const searchContainer = document.body.appendChild(document.createElement("div"));
       const rerender = () => {
-        render(renderTranscriptSearch(paneId, rerender), searchContainer);
+        searchView.update();
         render(renderChatThread({ ...props, onRequestUpdate: rerender }, transcript), container);
         transcript.hostUpdated();
       };
+      const searchView = mountTranscriptSearch(() => paneId, rerender, searchContainer);
       const ownName = () =>
         container.querySelector(".chat-group.user:not(.chat-group--peer) .chat-sender-name");
       try {

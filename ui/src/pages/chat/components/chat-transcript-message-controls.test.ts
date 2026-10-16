@@ -4,8 +4,8 @@ import { expectDefined } from "@openclaw/normalization-core";
 import { render } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTestTranscript } from "../chat-view.test-helpers.ts";
-import { renderTranscriptSearch, toggleTranscriptSearch } from "./chat-thread-interactions.ts";
-import { renderChatThread } from "./chat-thread.test-support.ts";
+import { getTranscriptState, toggleTranscriptSearch } from "./chat-thread-interactions.ts";
+import { renderChatThread, mountTranscriptSearch } from "./chat-thread.test-support.ts";
 import {
   flushDeferredRowPrune,
   installTranscriptDomMocks,
@@ -25,6 +25,34 @@ function touchPointerUp(element: Element): void {
 }
 
 describe("chat transcript message controls", () => {
+  it("refreshes native search from the mutable pane state without replacing its input", () => {
+    const paneId = "native-search-revision";
+    const state = getTranscriptState(paneId);
+    const search = mountTranscriptSearch(
+      () => paneId,
+      () => {},
+    );
+    try {
+      expect(search.container.querySelector("input")).toBeNull();
+      state.searchOpen = true;
+      search.update();
+      const input = expectDefined(
+        search.container.querySelector<HTMLInputElement>("input"),
+        "native search input",
+      );
+      input.focus();
+      state.searchQuery = "updated query";
+      search.update();
+      expect(search.container.querySelector("input")).toBe(input);
+      expect(input.value).toBe("updated query");
+      expect(document.activeElement).toBe(input);
+      state.searchOpen = false;
+      search.update();
+      expect(search.container.querySelector("input")).toBeNull();
+    } finally {
+      search.unmount();
+    }
+  });
   beforeEach(installTranscriptDomMocks);
   afterEach(resetTranscriptTestDom);
 
@@ -228,10 +256,11 @@ describe("chat transcript message controls", () => {
       const searchContainer = document.body.appendChild(document.createElement("div"));
       const container = document.body.appendChild(document.createElement("div"));
       const rerender = () => {
-        render(renderTranscriptSearch(paneId, rerender), searchContainer);
+        searchView.update();
         render(renderChatThread({ ...props, onRequestUpdate: rerender }, transcript), container);
         transcript.hostUpdated();
       };
+      const searchView = mountTranscriptSearch(() => paneId, rerender, searchContainer);
       try {
         toggleTranscriptSearch(paneId, rerender);
         transcript.hostConnected();
@@ -287,10 +316,11 @@ describe("chat transcript message controls", () => {
       const searchContainer = document.body.appendChild(document.createElement("div"));
       const container = document.body.appendChild(document.createElement("div"));
       const rerender = () => {
-        render(renderTranscriptSearch(paneId, rerender), searchContainer);
+        searchView.update();
         render(renderChatThread({ ...props, onRequestUpdate: rerender }, transcript), container);
         transcript.hostUpdated();
       };
+      const searchView = mountTranscriptSearch(() => paneId, rerender, searchContainer);
       try {
         if (search) {
           toggleTranscriptSearch(paneId, rerender);

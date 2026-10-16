@@ -3,7 +3,7 @@
 
 import { expectDefined } from "@openclaw/normalization-core";
 import { createRouter } from "@openclaw/uirouter";
-import { createSignal, flush } from "solid-js";
+import { createComponent, createSignal, flush } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../test/helpers/promise.js";
 
@@ -20,7 +20,6 @@ import type { ApplicationContext } from "../../app/context.ts";
 import { loadSettings, patchSettings } from "../../app/settings.ts";
 import { UI_COMMAND_EVENT } from "../../components/panel-toggle-contract.ts";
 import { sessionNavigationTarget } from "../../lib/sessions/route-navigation.ts";
-import { createLitContentRef } from "../../lit/solid-bridge.ts";
 import { createApplicationContextProvider } from "../../test-helpers/application-context.ts";
 import { mountSolid } from "../../test-helpers/mount-solid.ts";
 import { createSolidApplicationContextProvider } from "../../test-helpers/solid-application-context.tsx";
@@ -33,7 +32,7 @@ import {
 } from "./chat-page.test-support.ts";
 import { ChatPage } from "./chat-page.ts";
 import type { ChatRouteData } from "./route-loader.ts";
-import { renderChatRoute } from "./route-view.tsx";
+import { ChatRouteView } from "./route-view.tsx";
 import type { SessionChatRouteData } from "./session-route-data.ts";
 
 type RenderedPane = HTMLElement & {
@@ -81,11 +80,15 @@ describe("chat page close navigation", () => {
       presented: true,
     });
     const view = mountSolid(
-      () => {
-        const host = document.createElement("div");
-        createLitContentRef(() => renderChatRoute(route().data, false, route().presented))(host);
-        return host;
-      },
+      () =>
+        createComponent(ChatRouteView, {
+          get data() {
+            return route().data;
+          },
+          get presented() {
+            return route().presented;
+          },
+        }),
       { container, wrapper: provider.wrapper },
     );
     await Promise.resolve();
