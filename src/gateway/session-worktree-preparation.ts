@@ -343,7 +343,10 @@ export async function prepareSessionWorktree(params: {
 }): ReturnType<PrepareGatewaySessionLifecycle> {
   const { target, commitGuard } = params;
   const context = captureWorktreeRunEndContext(process.env);
-  const worktrees = new ManagedWorktreeService({ env: { ...process.env, ...context.environment } });
+  const worktrees = new ManagedWorktreeService({
+    env: { ...process.env, ...context.environment },
+    getConfig: () => params.cfg,
+  });
   const sandboxRequired =
     target.sandboxRequired === true ||
     target.entry?.sandbox === "required" ||

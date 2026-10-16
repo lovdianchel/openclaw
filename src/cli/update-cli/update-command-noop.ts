@@ -161,11 +161,7 @@ export async function finishAlreadyCurrentUpdate(
     let stopState = admission.foreground
       ? undefined
       : admission.services.get(params.managedServiceRoot ?? params.root);
-    if (
-      process.platform === "linux" &&
-      stopState?.serviceUpdateVerdict?.kind === "owned" &&
-      !stopState.blockMessage
-    ) {
+    if (stopState?.serviceUpdateVerdict?.kind === "owned" && !stopState.blockMessage) {
       stopState = await maybeStopManagedServiceBeforeMutableUpdate({
         ...inspection,
         root: params.managedServiceRoot ?? params.root,
