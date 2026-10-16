@@ -275,7 +275,7 @@ export function createChatSendReplyDispatch(params: {
             const authoredReply = parseReplyDirectives(extractAssistantAuthoredText(message));
             if (
               !answer ||
-              authoredReply.isSilent ||
+              (authoredReply.isSilent && !authoredReply.mediaUrls?.length) ||
               isSuppressedControlReplyText(authoredReply.text) ||
               !extractAssistantPhaseText(projectChatDisplayMessage(message))
             ) {
