@@ -1,7 +1,8 @@
 import { expectDefined } from "@openclaw/normalization-core";
-import { render, type LitElement } from "lit";
+import type { LitElement } from "lit";
 import { expect, onTestFinished, vi } from "vitest";
 import type { ChatAttachment } from "../../lib/chat/chat-types.ts";
+import { mountSolid } from "../../test-helpers/mount-solid.ts";
 import { waitForSolid } from "../../test-helpers/solid-settle.ts";
 import * as attachmentPayloadStore from "./attachment-payload-store.ts";
 import { renderChatView } from "./chat-view.test-helpers.ts";
@@ -14,7 +15,7 @@ export function createAttachmentSidebarHarness() {
     if (content.kind !== "attachment") {
       throw new Error("Expected an attachment side panel");
     }
-    render(content.renderActions?.(), container);
+    mountSolid(() => content.renderActions?.(), { container });
   });
   return { container, open };
 }

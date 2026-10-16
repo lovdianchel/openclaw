@@ -1,3 +1,4 @@
+import { dynamic } from "@solidjs/web";
 import type { Component } from "solid-js";
 import { createEffect, createMemo, createSignal, Show, untrack } from "solid-js";
 import type { ControlUiSurfaceProps } from "../../../../src/plugin-sdk/control-ui.js";
@@ -13,7 +14,7 @@ import { t } from "../../lib/reactive/i18n.ts";
 import { projectSource } from "../../lib/reactive/projection.ts";
 import { scopedSessionArtifactKey } from "../../lib/sessions/session-key.ts";
 import { PRESENTATION_CHANGED_EVENT } from "../../lit/presentation-binding.ts";
-import { LitContent, solidContent, emptyLegacyContent } from "../../lit/solid-content.tsx";
+import { LitContent, solidContent } from "../../lit/solid-content.tsx";
 import { getChatHistoryLoadState } from "./chat-history-state.ts";
 import { loadChatPendingInputs } from "./chat-pending-inputs.ts";
 import { forwardChatWheelToTranscript } from "./chat-scroll-input.ts";
@@ -202,7 +203,12 @@ function ChatComposerCompanion(input: ChatViewInput) {
           value={renderChatSelectionAnnotations({ ...input.props, disabled: !input.props.canSend })}
         />
       </Show>
-      <LitContent value={input.props.composerRecovery ?? emptyLegacyContent} />
+      <Show when={input.props.composerRecovery}>
+        {(recovery) => {
+          const Recovery = dynamic(() => recovery().component);
+          return <Recovery {...recovery()} />;
+        }}
+      </Show>
     </div>
   );
 }

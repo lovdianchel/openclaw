@@ -467,3 +467,18 @@ defineSolidBridge<RecoveryProps>(
     },
   },
 );
+
+export function PaneOutboxRecovery(props: {
+  state: ChatPageHost;
+  identity: string;
+  onRestored: () => void;
+}) {
+  return (
+    <openclaw-chat-outbox-recovery
+      prop:host={props.state}
+      prop:messages={props.state.chatMessages}
+      prop:identity={props.identity}
+      onOutbox-restored={() => props.onRestored()}
+    />
+  );
+}
