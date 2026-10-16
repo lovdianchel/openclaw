@@ -57,7 +57,7 @@ describe("ChatWorkingIndicator", () => {
             label: "Backend implementation",
             status: "running",
             listed: true,
-            session: { key: "agent:main:subagent:backend", updatedAt: 1 },
+            session: { key: "agent:main:subagent:backend", kind: "direct", updatedAt: 1 },
           },
         ],
       },
