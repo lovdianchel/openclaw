@@ -15,7 +15,6 @@ import {
 } from "../../../lib/chat/tool-call-grouping.ts";
 import { extractToolCardsCached } from "../../../lib/chat/tool-cards.ts";
 import { fnv1aUtf16 } from "../../../lib/fnv1a.ts";
-import { emptyLegacyContent as litNothing, solidContent } from "../../../lit/solid-content.tsx";
 import { ownSessionLaunchCalls } from "../chat-spawned-subagent.ts";
 import { transcriptRunId } from "../chat-thread-run-identity.ts";
 import { selectActivityHeadline } from "./chat-activity-headline-selection.ts";
@@ -44,11 +43,13 @@ function descendantCards(group: ToolCallGroup<ToolCard>) {
   return cards;
 }
 
-function ActivityOperation(props: {
+export type ActivityOperationProps = {
   group: ToolCallGroup<ToolCard>;
   options: NativeMessageGroupOptions;
   contexts: ToolContexts;
-}) {
+};
+
+export function ActivityOperation(props: ActivityOperationProps) {
   const context = () => props.contexts.get(props.group.card)!;
   const expanded = () => props.options.isToolExpanded?.(context().disclosureId) ?? false;
   return (
@@ -151,7 +152,7 @@ function prepareActivityGroup(
     includeInlineOutcomes: activityExpanded,
     ownSessionLaunches: ownSessionLaunchCalls(cards),
   });
-  const toolCardOverrides = new Map<ToolCard, unknown>();
+  const toolCardOverrides = new Map<ToolCard, ActivityOperationProps | null>();
   const approvalReviews = cards.flatMap((card) => readToolApprovalReviews(card.details));
   const recordedReviewOutcomes = cards.flatMap((card) => {
     const outcome = readToolApprovalReviewOutcome(card.details);
@@ -177,12 +178,9 @@ function prepareActivityGroup(
     for (const group of cardGroups) {
       if (group.children.length > 0) {
         for (const card of descendantCards(group)) {
-          toolCardOverrides.set(card, litNothing);
+          toolCardOverrides.set(card, null);
         }
-        toolCardOverrides.set(
-          group.card,
-          solidContent(ActivityOperation, { group, options: opts, contexts: toolContexts }),
-        );
+        toolCardOverrides.set(group.card, { group, options: opts, contexts: toolContexts });
       }
     }
   }
@@ -206,7 +204,9 @@ function prepareActivityGroup(
 }
 
 type ActivityState = NonNullable<ReturnType<typeof prepareActivityGroup>>;
-type ActivityEntries = (overrides: () => ReadonlyMap<ToolCard, unknown>) => JSX.Element;
+type ActivityEntries = (
+  overrides: () => ReadonlyMap<ToolCard, ActivityOperationProps | null>,
+) => JSX.Element;
 
 function ActivityGroupBody(props: {
   state: ActivityState;

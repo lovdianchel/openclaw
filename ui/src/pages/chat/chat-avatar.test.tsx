@@ -20,7 +20,7 @@ import {
 import { makeChatHost } from "./chat-host.test-support.ts";
 import type { ChatPageHost } from "./chat-state-host.ts";
 import { resolveChatAvatarUrl } from "./chat-state-route.ts";
-import { ChatAuthorAvatar, renderChatAuthorAvatar } from "./components/chat-author-avatar.ts";
+import { ChatAuthorAvatar } from "./components/chat-author-avatar.ts";
 import { ChatWelcome } from "./components/chat-welcome.tsx";
 
 const legacyContainers: HTMLElement[] = [];
@@ -194,19 +194,24 @@ it.each([["/console", "sample-bot", "1000000001", true]] as const)(
     };
     const identity = { ...sender.identity };
     const container = createLegacyContainer();
-    render(
-      renderChatAuthorAvatar(sender, "chat-author-avatar", undefined, {
-        key: "agent:main:main",
-        channelAvatarUrl:
-          basePath + "/__openclaw__/channel-avatar/agent%3Amain%3Amain?v=portrait-1",
-        origin: {
-          provider: "telegram",
-          accountId: "sample-bot",
-          chatType: "direct",
-          from: "telegram:1000000001",
-        },
-      }),
-      container,
+    mountSolid(
+      () => (
+        <ChatAuthorAvatar
+          sender={sender}
+          channelAvatar={{
+            key: "agent:main:main",
+            channelAvatarUrl:
+              basePath + "/__openclaw__/channel-avatar/agent%3Amain%3Amain?v=portrait-1",
+            origin: {
+              provider: "telegram",
+              accountId: "sample-bot",
+              chatType: "direct",
+              from: "telegram:1000000001",
+            },
+          }}
+        />
+      ),
+      { container },
     );
     expect(Boolean(container.querySelector("openclaw-channel-avatar"))).toBe(matches);
     expect(container.querySelector("[role=img]")?.getAttribute("aria-label")).toBe("Riley Adams");

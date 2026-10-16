@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 import { html, nothing, render } from "lit";
-import { AsyncDirective, directive } from "lit/async-directive.js";
+import { createEffect, onCleanup, useContext } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import {
@@ -11,6 +11,7 @@ import { markdownBlocksRef } from "../../../components/markdown-element-refs-sol
 import type { MarkdownRenderOptions } from "../../../components/markdown-render-options.ts";
 import { releaseMarkdownTables } from "../../../components/markdown-tables.ts";
 import { toSanitizedMarkdownHtml } from "../../../components/markdown.ts";
+import { SolidContentPresentation } from "../../../lit/solid-content.tsx";
 import { renderSolidRef } from "../../../test-helpers/render-solid-ref.ts";
 import { flush } from "../../../test-helpers/solid-settle.ts";
 import { prepareMarkdownMedia, type MarkdownMedia } from "./chat-message-media-markdown.ts";
@@ -389,7 +390,7 @@ describe("streaming Markdown DOM", () => {
   it("clears the canonical memo when a positional node becomes a media slot", () => {
     const prepared = prepareMarkdownMedia(
       [{ type: "image", image: { url: "https://example.invalid/image.png" } }],
-      () => html`<button>Media</button>`,
+      () => Object.assign(document.createElement("button"), { textContent: "Media" }),
     );
     const drawContent = (source: string) =>
       render(renderMarkdownMedia(source, prepared.media, true), container);
@@ -414,26 +415,39 @@ describe("streaming Markdown DOM", () => {
     async ({ before, after, suffix }) => {
       let policy = "allowed";
       const connections: boolean[] = [];
-      const mediaContent = directive(
-        class extends AsyncDirective {
-          render(label: string) {
-            return html`<button>${label}</button>`;
+      const mediaContent = (props: Parameters<MarkdownMedia["render"]>[0]) => {
+        const button = document.createElement("button");
+        const presented = useContext(SolidContentPresentation);
+        let active = true;
+        createEffect(
+          () => {
+            void props.item;
+            return policy;
+          },
+          (value) => {
+            button.textContent = value;
+          },
+        );
+        createEffect(presented, (next) => {
+          if (next !== active) {
+            connections.push(next);
           }
-          protected override disconnected() {
+          active = next;
+        });
+        onCleanup(() => {
+          if (active) {
             connections.push(false);
           }
-          protected override reconnected() {
-            connections.push(true);
-          }
-        },
-      );
+        });
+        return button;
+      };
       const prepared = prepareMarkdownMedia(
         [
           { type: "text", text: before },
           { type: "image", image: { url: "https://example.invalid/image.png" } },
           ...(after ? [{ type: "text" as const, text: after }] : []),
         ],
-        () => mediaContent(policy),
+        mediaContent,
       );
       const part = draw(prepared.markdown, { media: prepared.media });
       const paragraph = container.querySelector("p");

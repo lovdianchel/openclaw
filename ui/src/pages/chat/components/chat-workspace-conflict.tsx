@@ -168,7 +168,7 @@ export function WorkspaceConflictNotice(props: {
   );
 }
 
-function WorkspaceConflictTranscriptMessage(props: {
+export function WorkspaceConflictTranscriptMessage(props: {
   conflict: WorkspaceResultConflict;
   messageKey: string;
   entryId?: string;
@@ -218,10 +218,3 @@ function WorkspaceConflictTranscriptMessage(props: {
 export const renderWorkspaceConflictNotice = (
   props: Parameters<typeof WorkspaceConflictNotice>[0],
 ) => (props.conflict ? solidContent(WorkspaceConflictNotice, props) : emptyLegacyContent);
-export function renderWorkspaceConflictTranscriptMessage(
-  conflict: WorkspaceResultConflict,
-  messageKey: string,
-  entryId?: string,
-) {
-  return solidContent(WorkspaceConflictTranscriptMessage, { conflict, messageKey, entryId });
-}

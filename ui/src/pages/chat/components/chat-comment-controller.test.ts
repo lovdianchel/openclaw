@@ -1,8 +1,9 @@
 import { nothing, render } from "lit";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { ChatAttachment } from "../../../lib/chat/chat-types.ts";
-import { waitForSolid } from "../../../test-helpers/solid-settle.ts";
+import { mountSolid } from "../../../test-helpers/solid-render.tsx";
 import "../../../lib/toast-host.ts";
+import { waitForSolid } from "../../../test-helpers/solid-settle.ts";
 import {
   getChatAttachmentDataUrl,
   releaseChatAttachmentPayload,
@@ -10,9 +11,9 @@ import {
 import { createComposerContainer } from "../chat-composer.test-support.ts";
 import { renderChat } from "../chat-view-render.test-support.ts";
 import { createChatProps } from "../chat-view.test-helpers.ts";
-import type { ChatAttachmentControlsProps } from "./chat-attachment-controls.types.ts";
 import "./chat-comment-controller.ts";
-import { renderChatSelectionAnnotations } from "./chat-selection-annotations.ts";
+import type { ChatAttachmentControlsProps } from "./chat-attachment-controls.types.ts";
+import { ChatSelectionAnnotations } from "./chat-selection-annotations.tsx";
 import { createChatSelectionAttachment } from "./chat-selection-attachment.ts";
 
 const payloads = new Set<string>();
@@ -78,12 +79,13 @@ async function mountComments(additional: ChatAttachment[] = []) {
         payloads.add(item.id);
       }
       controller.props = { ...props, attachments };
-      render(renderChatSelectionAnnotations(controller.props), composer);
+      annotations.update(controller.props);
     },
   };
   controller.props = props;
   controller.sessionKey = "agent:main:main";
-  render(renderChatSelectionAnnotations(props), composer);
+  const annotations = mountSolid(ChatSelectionAnnotations, props, composer);
+  onTestFinished(annotations.dispose);
   const toast = document.createElement("openclaw-toast-host");
   card.append(controller, composer, toast);
   document.body.append(card);

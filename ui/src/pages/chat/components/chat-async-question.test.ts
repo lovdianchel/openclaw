@@ -1,22 +1,28 @@
+import { createComponent, Show } from "solid-js";
 /* @vitest-environment jsdom */
-
-import { html, nothing, render } from "lit";
 import { afterEach, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import type { ChatQueueItem } from "../../../lib/chat/chat-types.ts";
+import { cleanupSolid } from "../../../test-helpers/mount-solid.ts";
+import { mountSolid } from "../../../test-helpers/solid-render.tsx";
 import { rememberLiveTerminalRun } from "../terminal-message-identity.ts";
+import {
+  clearQuestionSummary,
+  renderQuestionSummary,
+} from "./chat-async-question-summary.test-support.ts";
+import { AsyncQuestionSummary } from "./chat-async-question-summary.tsx";
 import {
   createAsyncQuestionPresentation,
   createAsyncQuestionPanelProps,
-  renderAsyncQuestionSummary,
   readAsyncQuestions,
 } from "./chat-async-question.ts";
 import type { AsyncQuestionDraft } from "./chat-async-question.types.ts";
-import "./chat-question-panel.tsx";
+import { ChatQuestionPanel } from "./chat-question-panel.tsx";
 
 const container = document.createElement("div");
 afterEach(() => {
-  render(nothing, container);
+  clearQuestionSummary(container);
+  cleanupSolid();
   container.remove();
 });
 
@@ -242,7 +248,7 @@ it("reopens the archived question with its draft until another later completion"
   state.asyncQuestionDrafts.set("old", draft);
   const messages = [old, terminal("run-1"), terminal("run-2")];
   let presentation = present(messages, state);
-  render(renderAsyncQuestionSummary(readAsyncQuestions(old)!, presentation), container);
+  renderQuestionSummary(readAsyncQuestions(old)!, presentation, container);
   expect(container.textContent).toContain("Which audience?");
   expect(container.textContent).toContain("No longer pending");
   expect(container.textContent).not.toContain("Answer above the message box.");
@@ -295,20 +301,47 @@ it.each(["answered", "failed"] as const)(
       itemId: "question-1",
       questions: [{ title: "Which audience?", options: ["Engineers", "Everyone"] }],
     };
+    function Question(props: {
+      presentation: ReturnType<typeof createAsyncQuestionPresentation>;
+      submitted: boolean;
+    }) {
+      return createComponent(Show, {
+        get when() {
+          return props.submitted;
+        },
+        get fallback() {
+          return createComponent(ChatQuestionPanel, {
+            get props() {
+              return createAsyncQuestionPanelProps(questions, props.presentation, {});
+            },
+          });
+        },
+        get children() {
+          return createComponent(AsyncQuestionSummary, {
+            questions,
+            get presentation() {
+              return props.presentation;
+            },
+          });
+        },
+      });
+    }
+    let mounted: ReturnType<typeof mountSolid<Parameters<typeof Question>[0]>> | undefined;
     const draw = () => {
       const presentation = createAsyncQuestionPresentation(state, {
         sessionKey: "agent:main:main",
         onAsyncQuestionSubmit: submit,
         onRequestUpdate: draw,
       });
-      render(
-        state.asyncQuestionDrafts.get(questions.itemId)?.status === "submitted"
-          ? renderAsyncQuestionSummary(questions, presentation)
-          : html`<openclaw-chat-question-panel
-              .props=${createAsyncQuestionPanelProps(questions, presentation, {})}
-            ></openclaw-chat-question-panel>`,
-        container,
-      );
+      const props = {
+        presentation,
+        submitted: state.asyncQuestionDrafts.get(questions.itemId)?.status === "submitted",
+      };
+      if (mounted) {
+        mounted.update(props);
+      } else {
+        mounted = mountSolid(Question, props, container);
+      }
     };
     draw();
     await vi.waitFor(() =>
@@ -321,7 +354,8 @@ it.each(["answered", "failed"] as const)(
       undefined,
     );
 
-    render(nothing, container);
+    mounted?.dispose();
+    mounted = undefined;
     draw();
     await vi.waitFor(() =>
       expect(container.querySelector(".chat-question-panel__advance")).not.toBeNull(),
@@ -346,6 +380,7 @@ it.each(["answered", "failed"] as const)(
       ).toBe(false);
     }
     expect(submit).toHaveBeenCalledTimes(1);
+    mounted?.dispose();
   },
 );
 
@@ -391,10 +426,7 @@ it("keeps a persisted answer resolved across remount and reconnect and displays 
   for (const epoch of [1, 2]) {
     const presentation = historyPresentation([historicalQuestion(), historicalAnswer], epoch);
     expect(presentation.pending).toEqual([]);
-    render(
-      renderAsyncQuestionSummary(historicalQuestion().openclawAsyncDelivery, presentation),
-      container,
-    );
+    renderQuestionSummary(historicalQuestion().openclawAsyncDelivery, presentation, container);
     expect(container.textContent).toContain("Everyone");
   }
 });
@@ -465,7 +497,7 @@ it("restores every answer in a multi-question submission with UTF-8-bounded quot
   };
   const presentation = historyPresentation([promptMessage, answer]);
   expect(presentation.pending).toHaveLength(0);
-  render(renderAsyncQuestionSummary(promptMessage.openclawAsyncDelivery, presentation), container);
+  renderQuestionSummary(promptMessage.openclawAsyncDelivery, presentation, container);
   expect(container.textContent).toContain("Two");
   expect(container.textContent).toContain("First line\nSecond line");
   expect(
@@ -501,10 +533,7 @@ it.each([
     for (const epoch of [1, 2]) {
       const presentation = historyPresentation([promptMessage, answer], epoch);
       expect(presentation.pending).toHaveLength(confirmed ? 0 : 1);
-      render(
-        renderAsyncQuestionSummary(promptMessage.openclawAsyncDelivery, presentation),
-        container,
-      );
+      renderQuestionSummary(promptMessage.openclawAsyncDelivery, presentation, container);
       expect(container.textContent?.includes("Answer sent")).toBe(confirmed);
       if (confirmed) {
         expect(container.textContent).toContain(answer.content);
@@ -536,7 +565,7 @@ it("projects answer delivery from the outbox, retries its payload, and waits for
   };
   const draw = () => {
     const presentation = createAsyncQuestionPresentation(state, props);
-    render(renderAsyncQuestionSummary(readAsyncQuestions(messages[0])!, presentation), container);
+    renderQuestionSummary(readAsyncQuestions(messages[0])!, presentation, container);
     return presentation;
   };
   const pending = draw();

@@ -1,12 +1,14 @@
 /* @vitest-environment jsdom */
-import { render } from "lit";
 import { beforeEach, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import type { DurableQuestionDraft } from "../../../lib/chat/composer-draft-store.runtime.ts";
 import {
+  clearQuestionSummary,
+  renderQuestionSummary,
+} from "./chat-async-question-summary.test-support.ts";
+import {
   createAsyncQuestionPanelProps,
   createAsyncQuestionPresentation,
-  renderAsyncQuestionSummary,
 } from "./chat-async-question.ts";
 import { getTranscriptState, resetThreadPresentation } from "./chat-thread-interactions.ts";
 
@@ -452,10 +454,10 @@ it.each(["Undo", "Answer"])(
     expect(restoring.pending).toHaveLength(0);
     expect(onReopen).not.toHaveBeenCalled();
     const summary = document.createElement("div");
-    render(renderAsyncQuestionSummary(question, restoring), summary);
+    renderQuestionSummary(question, restoring, summary);
     expect(summary.textContent).toContain("Restoring answer");
     expect(summary.querySelector<HTMLButtonElement>("button")?.disabled).toBe(true);
-    render(null, summary);
+    clearQuestionSummary(summary);
 
     // Establish that the reopening transaction has reached its held write before
     // mounting a second reader; this is the delayed commit boundary under test.
@@ -584,22 +586,20 @@ it.each(["mounted", "reloaded"] as const)(
     const delivered = createAsyncQuestionPresentation(recoveredState, deliveryProps);
     expect(delivered.pending).toEqual([]);
     const summary = document.createElement("div");
-    render(renderAsyncQuestionSummary(multiQuestion, delivered), summary);
+    renderQuestionSummary(multiQuestion, delivered, summary);
     expect(summary.textContent).toContain(queued.text);
     const revisedText = queued.text.replace("Include this example:", "Updated in the outbox:");
-    render(
-      renderAsyncQuestionSummary(
-        multiQuestion,
-        createAsyncQuestionPresentation(recoveredState, {
-          ...deliveryProps,
-          queue: [{ ...queued, text: revisedText }],
-        }),
-      ),
+    renderQuestionSummary(
+      multiQuestion,
+      createAsyncQuestionPresentation(recoveredState, {
+        ...deliveryProps,
+        queue: [{ ...queued, text: revisedText }],
+      }),
       summary,
     );
     expect(summary.textContent).toContain(revisedText);
     expect(summary.textContent).not.toContain("Include this example:");
-    render(null, summary);
+    clearQuestionSummary(summary);
     delivered.discard(queued);
     const reopened = createAsyncQuestionPresentation(recoveredState, activeProps);
     expect(reopened.pending.map((entry) => entry.itemId)).toEqual([multiQuestion.itemId]);

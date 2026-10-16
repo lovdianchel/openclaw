@@ -8,6 +8,7 @@ import type { PresentationValue } from "../../../lit/presentation-binding.ts";
 import type { PluginToolIcons } from "../chat-tool-icon-controller.ts";
 import type { LinkFaviconFetcher } from "../link-favicon-cache.ts";
 import type { AsyncQuestionPresentation } from "./chat-async-question.types.ts";
+import type { ActivityOperationProps } from "./chat-message-activity-view.tsx";
 import type { MessageActionDetails } from "./chat-message-markdown.types.ts";
 import type { ArtifactDownloadResolver } from "./chat-message-media.ts";
 import type { AssistantMessageDisclosure } from "./chat-message-text-preparation.ts";
@@ -39,7 +40,7 @@ export type GroupedMessageOptions = {
   messageActions?: MessageActionDetails | null;
   isToolExpanded?: (toolCardId: string) => boolean;
   onToggleToolExpanded?: (toolCardId: string, expanded?: boolean) => void;
-  toolCardOverrides?: ReadonlyMap<ToolCard, unknown>;
+  toolCardOverrides?: ReadonlyMap<ToolCard, ActivityOperationProps | null>;
   onRequestUpdate?: () => void;
   canvasPluginSurfaceUrl?: string | null;
   resourceBasePath?: string;

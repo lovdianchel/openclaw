@@ -266,7 +266,7 @@ export function StreamGroup(props: { parts: StreamGroupPart[]; options: StreamGr
         <ReplyLineView line={replyLine()} actions={props.options} />
         <StreamGroupParts parts={props.parts} options={props.options} presentation="standalone" />
       </div>
-      <ReplyLineConnector line={replyLine()} avatar={hasAvatar() ? true : litNothing} />
+      <ReplyLineConnector line={replyLine()} avatar={hasAvatar()} />
       <Show when={startedAt() !== null}>
         <div class="chat-group-footer" aria-hidden={active() ? "true" : undefined}>
           <Show when={!active()}>

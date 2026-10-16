@@ -10,9 +10,10 @@ import { resolveMessageDisplayMarkdown } from "../../../lib/chat/message-display
 import { extractText } from "../../../lib/chat/message-extract.ts";
 import { normalizeMessage } from "../../../lib/chat/message-normalizer.ts";
 import { renderSolidRef } from "../../../test-helpers/render-solid-ref.ts";
+import { mountSolid } from "../../../test-helpers/solid-render.tsx";
 import { flush } from "../../../test-helpers/solid-settle.ts";
 import { persistedMessageEntryId } from "../chat-thread-items.ts";
-import { renderGroupedMessage } from "./chat-message-bubble.ts";
+import { GroupedMessage } from "./chat-message-bubble-view.tsx";
 import { prepareChatMessageRender, resolveMessageActionDetails } from "./chat-message-markdown.ts";
 import { renderMessageMarkdown } from "./chat-message-text.test-support.ts";
 
@@ -474,20 +475,21 @@ describe("persisted human mentions in message bubbles", () => {
     },
   ])("attaches identities only to unchanged selected user spans: $name", (entry) => {
     const host = document.createElement("div");
-    render(
-      renderGroupedMessage(
-        prepareChatMessageRender({
+    mountSolid(
+      GroupedMessage,
+      {
+        preparation: prepareChatMessageRender({
           role: entry.role,
           content: entry.content,
           __openclaw: entry.metadata,
         }),
-        "message",
-        {
+        messageKey: "message",
+        options: {
           isStreaming: false,
           showReasoning: false,
           messageActions: entry.replacement ? { markdown: entry.replacement } : undefined,
         },
-      ),
+      },
       host,
     );
     const references = host.querySelectorAll("openclaw-person-reference");
