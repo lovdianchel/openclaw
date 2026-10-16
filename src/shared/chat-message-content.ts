@@ -196,13 +196,11 @@ export function extractAssistantTextForPhase(
     return text?.trim() ? text : undefined;
   }
 
-  const parts: string[] = [];
-  for (const block of readAssistantTextBlocksForPhase(message, phase)) {
-    const sanitized = sanitizeBlockText(block.text);
-    if (sanitized.trim()) {
-      parts.push(sanitized);
-    }
-  }
+  const sourceTexts = readAssistantTextBlocksForPhase(message, phase).map((block) => block.text);
+  // Literal joins preserve authored whitespace and sanitize across block boundaries.
+  const parts = (joinWith === "" ? [sourceTexts.join("")] : sourceTexts)
+    .map(sanitizeBlockText)
+    .filter((text) => text.trim());
   return parts.length ? parts.join(joinWith) : undefined;
 }
 

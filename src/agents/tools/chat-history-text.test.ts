@@ -3,6 +3,17 @@ import { textAssistant } from "../test-helpers/sparse-transcript.test-support.js
 import { extractStoredAssistantText } from "./chat-history-text.js";
 
 describe("extractStoredAssistantText", () => {
+  it.each([undefined, "final_answer"])("preserves whitespace-only blocks in %s text", (phase) => {
+    const content = ["First line", "\n \t", "Second line"].map((text, index) => ({
+      type: "text",
+      text,
+      textSignature: phase ? JSON.stringify({ v: 1, id: String(index), phase }) : undefined,
+    }));
+    expect(extractStoredAssistantText({ role: "assistant", content })).toBe(
+      "First line\n \tSecond line",
+    );
+  });
+
   it.each([
     { name: "plain text", content: "Internal reasoning.\nNO_REPLY", expected: "NO_REPLY" },
     {

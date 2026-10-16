@@ -3,7 +3,6 @@ import { normalizeOptionalString } from "@openclaw/normalization-core/string-coe
 import {
   extractAssistantAuthoredText,
   extractAssistantTextForPhase,
-  type AssistantPhase,
   parseAssistantTextSignature,
   readAssistantTextBlocksForPhase,
 } from "./chat-message-content.js";
@@ -12,12 +11,6 @@ import {
   sanitizeAssistantVisibleText,
 } from "./text/assistant-visible-text.js";
 
-function readAuthoredPhaseText(message: Record<string, unknown>, phase?: AssistantPhase): string {
-  return Array.isArray(message.content) && typeof message.text !== "string"
-    ? extractAssistantAuthoredText({ content: readAssistantTextBlocksForPhase(message, phase) })
-    : (extractAssistantTextForPhase(message, { phase }) ?? "");
-}
-
 /** Selects canonical final-answer bytes before channel reply directives are parsed. */
 export function resolveRawAssistantAnswerText(message: unknown): string {
   const lastAssistant = asOptionalRecord(message);
@@ -25,7 +18,7 @@ export function resolveRawAssistantAnswerText(message: unknown): string {
     return "";
   }
   const finalAnswerText = sanitizeAssistantFinalAnswerText(
-    readAuthoredPhaseText(lastAssistant, "final_answer"),
+    extractAssistantTextForPhase(lastAssistant, { phase: "final_answer", joinWith: "" }) ?? "",
   );
   if (finalAnswerText.trim()) {
     return normalizeOptionalString(finalAnswerText) ?? "";
@@ -43,7 +36,10 @@ export function resolveRawAssistantAnswerText(message: unknown): string {
     return signedText;
   }
   return (
-    normalizeOptionalString(sanitizeAssistantVisibleText(readAuthoredPhaseText(lastAssistant))) ??
-    ""
+    normalizeOptionalString(
+      sanitizeAssistantVisibleText(
+        extractAssistantTextForPhase(lastAssistant, { joinWith: "" }) ?? "",
+      ),
+    ) ?? ""
   );
 }
