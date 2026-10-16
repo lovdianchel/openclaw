@@ -1808,22 +1808,27 @@ describe("runCliAgent reliability", () => {
     expect(JSON.stringify(messages)).not.toContain("matched secret prompt");
   });
 
-  it.each(["   ", SILENT_REPLY_TOKEN])(
-    "distinguishes authored silence from missing optional CLI output %j",
-    async (text) => {
+  it.each([
+    { text: "   ", expectation: "optional", disposition: "empty" },
+    { text: SILENT_REPLY_TOKEN, expectation: "optional", disposition: "silent" },
+    { text: "   ", expectation: "required", disposition: undefined },
+    { text: "   ", expectation: "result-required", disposition: undefined },
+  ] as const)(
+    "settles $expectation CLI output $text according to its reply obligation",
+    async ({ text, expectation, disposition }) => {
       const hookRunner = createLifecycleHooks(["llm_output"]);
       supervisorSpawnMock.mockResolvedValueOnce(makeManagedRun({ stdout: text }));
 
       const context = makeClaudePreparedContext({
         model: "claude-sonnet-4-6",
-        allowEmptyAssistantReplyAsSilent: true,
       });
       context.params.messageChannel = "telegram";
+      context.params.terminalReplyExpectation = expectation;
       const operation = runPreparedCliAgent(context);
-      if (text.trim()) {
+      if (disposition) {
         const result = await operation;
         expect(result.payloads).toBeUndefined();
-        expect(result.meta.terminalReply).toEqual({ disposition: "silent" });
+        expect(result.meta.terminalReply).toEqual({ disposition });
         expect(result.meta.executionTrace?.fallbackUsed).toBe(false);
         expect(hookRunner.runLlmOutput).toHaveBeenCalledOnce();
       } else {

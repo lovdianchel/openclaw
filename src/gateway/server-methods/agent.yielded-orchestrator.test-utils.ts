@@ -322,7 +322,10 @@ describe("gateway agent handler yielded orchestrator follow-ups", () => {
               outcome: expect.objectContaining({ status: "ok" }),
             }),
           );
-          const prepared = await readSubagentRunAnnounceResult(completed);
+          // Keep the live owner read independent of post-cleanup payload compaction.
+          const prepared = await readSubagentRunAnnounceResult(completed, (id) =>
+            subagentRuns.get(id),
+          );
           expect(prepared.text).toBe(result);
           expect(prepared.isCurrent()).toBe(true);
 

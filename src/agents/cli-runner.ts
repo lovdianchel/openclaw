@@ -76,7 +76,7 @@ import {
   runAgentHarnessLlmInputHook,
   runAgentHarnessLlmOutputHook,
 } from "./harness/lifecycle-hook-helpers.js";
-import { resolveReplyExpectation } from "./reply-completion.js";
+import { isRequiredReplyExpectation, resolveReplyExpectation } from "./reply-completion.js";
 
 const log = createSubsystemLogger("agents/cli-runner");
 
@@ -375,14 +375,16 @@ async function runPreparedCliAgentOwned(
     const preparedReply = prepareCliRunTerminalReply(context, output);
     const { sourceReplyMirror, completedFinalSource } = preparedReply;
     const assistantText = preparedReply.text;
+    const replyExpectation = resolveReplyExpectation(params);
     if (
       !output.terminalInterruption &&
-      ((resolveReplyExpectation(params) === "result-required" &&
+      ((replyExpectation === "result-required" &&
         !params.controlOperation &&
         !(isolatedCompletion && params.outputTextPolicy === "strict-visible") &&
         preparedReply.terminalReply.disposition !== "visible" &&
         !completedFinalSource) ||
-        (!output.text.trim() &&
+        (isRequiredReplyExpectation(replyExpectation) &&
+          !output.text.trim() &&
           !params.controlOperation &&
           resolveSourceReplyDelivery(output) === "missing" &&
           !output.toolMediaUrls?.length &&

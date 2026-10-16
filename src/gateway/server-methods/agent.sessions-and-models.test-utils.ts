@@ -559,7 +559,8 @@ describe("gateway agent handler", () => {
             terminalReply,
           }),
         );
-        const prepared = await readSubagentRunAnnounceResult(run);
+        // Keep the live owner read independent of post-cleanup payload compaction.
+        const prepared = await readSubagentRunAnnounceResult(run, (id) => subagentRuns.get(id));
         expect(prepared.text).toBe(result);
         expect(prepared.isCurrent()).toBe(true);
       },
