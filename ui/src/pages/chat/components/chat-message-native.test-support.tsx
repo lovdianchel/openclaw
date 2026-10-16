@@ -1,6 +1,7 @@
 import type { JSX } from "@solidjs/web";
 import {
   createComponent,
+  createMemo,
   createSignal,
   For,
   getOwner,
@@ -184,6 +185,7 @@ function ContentView(props: { value: Content }): JSX.Element {
   };
   return (
     <Show
+      keyed
       when={view()?.component}
       fallback={
         <Show when={items()} fallback={plain()}>
@@ -195,12 +197,16 @@ function ContentView(props: { value: Content }): JSX.Element {
         </Show>
       }
     >
-      {(component) =>
-        createComponent(
-          untrack(component),
-          merge(() => view()!.props),
-        )
-      }
+      {(component) => {
+        const selected = component;
+        const initial = untrack(() => view()!.props);
+        // Keep the retiring component's props until Show disposes its owner.
+        const currentProps = createMemo<Record<string, unknown>>((previous) => {
+          const current = view();
+          return current?.component === selected ? current.props : (previous ?? initial);
+        });
+        return createComponent(selected, merge(currentProps));
+      }}
     </Show>
   );
 }

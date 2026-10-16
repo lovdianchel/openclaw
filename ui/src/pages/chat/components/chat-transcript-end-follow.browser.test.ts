@@ -24,6 +24,8 @@ class EndFollowFixture extends TranscriptTestHost {
   private readonly earlier = document.createElement("div");
   private readonly last = document.createElement("div");
   private readonly contents = document.createElement("div");
+  private renderedEarlierRowHeight: number | undefined;
+  private renderedLastRowHeight: number | undefined;
 
   constructor() {
     super();
@@ -41,8 +43,15 @@ class EndFollowFixture extends TranscriptTestHost {
 
   override renderTranscript = () => {
     this.viewport.style.cssText = `height: ${this.viewportHeight}px; flex: none; padding: 0 0 ${this.viewportPadding}px`;
-    this.earlier.style.height = `${this.earlierRowHeight}px`;
-    this.last.style.height = `${this.lastRowHeight}px`;
+    // Preserve intrinsic DOM growth when a measurement requests another commit.
+    if (this.renderedEarlierRowHeight !== this.earlierRowHeight) {
+      this.earlier.style.height = `${this.earlierRowHeight}px`;
+      this.renderedEarlierRowHeight = this.earlierRowHeight;
+    }
+    if (this.renderedLastRowHeight !== this.lastRowHeight) {
+      this.last.style.height = `${this.lastRowHeight}px`;
+      this.renderedLastRowHeight = this.lastRowHeight;
+    }
     const rows: TranscriptRow[] = [
       { kind: "content", key: "earlier", content: this.earlier },
       { kind: "content", key: "growing-run", content: this.last },

@@ -13,12 +13,17 @@ import {
 } from "../components/chat-thread-interactions.ts";
 import { ChatThread } from "../components/chat-thread-view.tsx";
 import type { ChatTranscriptController } from "../components/chat-transcript-controller.ts";
+import type { TranscriptRow } from "../components/chat-transcript-layout.ts";
 import { TranscriptSearch } from "../components/chat-transcript-search.tsx";
 import type { ChatTranscriptSession } from "../components/chat-transcript-session.ts";
-import {
-  flushDeferredRowPrune,
-  type TestContentRow,
-} from "../components/chat-transcript.test-support.ts";
+
+export type TestContentRow = Extract<TranscriptRow, { kind: "content" }>;
+
+export async function flushDeferredRowPrune(): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
 
 class ThreadFixture {
   constructor(

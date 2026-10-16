@@ -88,9 +88,10 @@ describe("chat pane keyboard focus", () => {
       pane.historyAutoLoadBlocked = true;
       vi.stubGlobal("IntersectionObserver", undefined);
       const thread = document.createElement("div");
+      // Run with the native root currentTarget before Solid's delegate retargets it.
+      thread.addEventListener("keydown", (event) => pane.handleTranscriptHistoryIntent(event));
       mountSolid(content, { container: thread });
       const restorePlatform = configureNativeKeyTarget(thread.firstElementChild!, fixture);
-      thread.addEventListener("keydown", (event) => pane.handleTranscriptHistoryIntent(event));
       try {
         thread.firstElementChild!.dispatchEvent(
           new KeyboardEvent("keydown", {

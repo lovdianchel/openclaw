@@ -1,4 +1,4 @@
-import { createComponent, createSignal, flush } from "solid-js";
+import { createSignal, flush } from "solid-js";
 /* @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
@@ -8,6 +8,7 @@ import {
   SHELL_NAV_DRAWER_TOGGLE_EVENT,
   type ShellNavDrawerToggleDetail,
 } from "../../../components/command-palette-contract.ts";
+import { icons } from "../../../components/icons.ts";
 import { resolveSessionWorkspace } from "../../../lib/sessions/workspace.ts";
 import { LitContent } from "../../../lit/solid-content.tsx";
 import { createTestGatewayClient } from "../../../test-helpers/gateway-client.ts";
@@ -92,15 +93,7 @@ function mountIntegratedPresenceHeader(params: {
       null,
     );
   const [content, setContent] = createSignal(header());
-  mountSolid(
-    () =>
-      createComponent(LitContent, {
-        get value() {
-          return content();
-        },
-      }),
-    { container },
-  );
+  mountSolid(() => <LitContent value={content()} />, { container });
   const renderHeader = () => {
     setContent(header());
     flush();
@@ -173,7 +166,9 @@ describe("chat pane header", () => {
     const { container } = mountHeader({
       narrow: true,
       mergedChrome: true,
-      panelMenuActions: [{ id: "terminal", label: "Terminal", icon: null, onActivate: onTerminal }],
+      panelMenuActions: [
+        { id: "terminal", label: "Terminal", icon: icons.copy, onActivate: onTerminal },
+      ],
       sessionMenuAction: <button data-action="session-menu"></button>,
       onOpenSplitView: vi.fn(),
       onSplitDown: vi.fn(),
@@ -603,7 +598,9 @@ describe("chat pane header", () => {
     const { container } = mountHeader({
       catalog: true,
       session: undefined,
-      panelMenuActions: [{ id: "terminal", label: "Terminal", icon: null, onActivate: vi.fn() }],
+      panelMenuActions: [
+        { id: "terminal", label: "Terminal", icon: icons.copy, onActivate: vi.fn() },
+      ],
     });
     expect(container.querySelector(".chat-pane__session-title-button")).toBeNull();
     expect(container.querySelector(".chat-pane__session-title")?.textContent).toContain(

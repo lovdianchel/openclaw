@@ -84,6 +84,7 @@ import {
   getThinkingSliderValues,
   itemAt,
 } from "./chat-view.test-helpers.ts";
+import type { ChatProps } from "./chat-view.tsx";
 import * as chatMessageConfirmation from "./components/chat-message-confirmation.ts";
 import { renderChatModelAccountControl } from "./components/chat-model-account-control.ts";
 import { ChatModelControls } from "./components/chat-model-controls.tsx";
@@ -258,8 +259,6 @@ type ChatHeaderTestState = {
   resetChatScroll(): void;
   resetToolStream(): void;
 };
-
-type ChatProps = Parameters<typeof renderChat>[0];
 
 function createOpenAiModelCatalog(): ModelCatalogEntry[] {
   return [
@@ -551,7 +550,9 @@ function renderModelControls(
     const [props, setProps] = createSignal(next);
     mountSolid(() => createComponent(ChatModelControls, merge(props)), { container });
     mountedModelControls.set(container, setProps);
-    onTestFinished(() => mountedModelControls.delete(container));
+    onTestFinished(() => {
+      mountedModelControls.delete(container);
+    });
   }
   flush();
   return container;
@@ -1168,14 +1169,11 @@ describe("direct thread avatar mode", () => {
     agentsList: { defaultId: "work", mainKey: "main", scope: "global" as const },
     hello: null,
   };
-  const message = [{ role: "user", content: "hi", timestamp: 1 }] satisfies Parameters<
-    typeof renderChat
-  >[0]["messages"];
-  const avatarCase = (
-    sessionKey: string,
-    direct: boolean,
-    overrides: Partial<Parameters<typeof renderChat>[0]> = {},
-  ) => ({ props: { sessionKey, messages: message, ...overrides }, direct });
+  const message = [{ role: "user", content: "hi", timestamp: 1 }] satisfies ChatProps["messages"];
+  const avatarCase = (sessionKey: string, direct: boolean, overrides: Partial<ChatProps> = {}) => ({
+    props: { sessionKey, messages: message, ...overrides },
+    direct,
+  });
 
   it.each([
     [
