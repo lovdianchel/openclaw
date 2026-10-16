@@ -1,6 +1,5 @@
 import DOMPurify from "dompurify";
-import { html, nothing, render } from "lit";
-import { createEffect, onCleanup, useContext } from "solid-js";
+import { createEffect, useContext } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import {
@@ -13,12 +12,31 @@ import { releaseMarkdownTables } from "../../../components/markdown-tables.ts";
 import { toSanitizedMarkdownHtml } from "../../../components/markdown.ts";
 import { SolidContentPresentation } from "../../../lit/solid-content.tsx";
 import { renderSolidRef } from "../../../test-helpers/render-solid-ref.ts";
-import { flush } from "../../../test-helpers/solid-settle.ts";
+import { mountSolid } from "../../../test-helpers/solid-render.tsx";
 import { prepareMarkdownMedia, type MarkdownMedia } from "./chat-message-media-markdown.ts";
-import { renderMarkdownMedia, renderMessageMarkdown } from "./chat-message-text.test-support.ts";
+import {
+  MarkdownContent,
+  MessageMarkdown,
+  type MessageMarkdownProps,
+} from "./chat-message-text-view.tsx";
 
 let container: HTMLDivElement;
 let blocks: ReturnType<typeof renderSolidRef>;
+type PresentedMessage = MessageMarkdownProps & { presented: boolean };
+type RawContent = Parameters<typeof MarkdownContent>[0];
+let messageView: ReturnType<typeof mountSolid<PresentedMessage>> | undefined;
+let rawView: ReturnType<typeof mountSolid<RawContent>> | undefined;
+let messageProps: PresentedMessage;
+
+function MessageView(props: PresentedMessage) {
+  return (
+    <SolidContentPresentation value={() => props.presented}>
+      <section>
+        <MessageMarkdown {...props} />
+      </section>
+    </SolidContentPresentation>
+  );
+}
 
 beforeEach(() => {
   container = document.createElement("div");
@@ -29,7 +47,10 @@ beforeEach(() => {
 afterEach(() => {
   releaseMarkdownTables(container);
   container.removeEventListener("click", handleMarkdownCodeBlockClick);
-  render(nothing, container);
+  messageView?.dispose();
+  rawView?.dispose();
+  messageView = undefined;
+  rawView = undefined;
   blocks.unmount();
   container.remove();
 });
@@ -48,19 +69,41 @@ function draw(
     options?: MarkdownRenderOptions;
   } = {},
 ) {
-  return render(
-    html`<section>
-      ${renderMessageMarkdown(
-        source,
-        key,
-        { role: "assistant", isStreaming: streaming },
-        { codeBlockInteraction: "interactive", tableInteractions: "enabled", ...options },
-        undefined,
-        media,
-      )}
-    </section>`,
-    container,
-  );
+  rawView?.dispose();
+  rawView = undefined;
+  messageProps = {
+    markdown: source,
+    messageKey: key,
+    options: { role: "assistant", isStreaming: streaming },
+    markdownOptions: {
+      codeBlockInteraction: "interactive",
+      tableInteractions: "enabled",
+      ...options,
+    },
+    media,
+    presented: true,
+  };
+  if (messageView) {
+    messageView.update(messageProps);
+  } else {
+    messageView = mountSolid(MessageView, messageProps, container);
+  }
+}
+
+function presentMessage(presented: boolean) {
+  messageProps = { ...messageProps, presented };
+  messageView!.update(messageProps);
+}
+
+function drawContent(content: RawContent["content"], media?: MarkdownMedia) {
+  messageView?.dispose();
+  messageView = undefined;
+  const props = { content, media, incremental: true };
+  if (rawView) {
+    rawView.update(props);
+  } else {
+    rawView = mountSolid(MarkdownContent, props, container);
+  }
 }
 
 describe("streaming Markdown DOM", () => {
@@ -304,18 +347,13 @@ describe("streaming Markdown DOM", () => {
   );
 
   it("keeps every sibling when sanitized identity hints are missing or duplicated", () => {
-    const drawContent = (items: Array<[string | null, string]>) =>
-      render(
-        renderMarkdownMedia(
-          DOMPurify.sanitize(
-            `<section>${items.map(([key, text]) => `<p${key === null ? "" : ` data-markdown-key="${key}"`}>${text}</p>`).join("")}</section>`,
-          ),
-          undefined,
-          true,
+    const drawItems = (items: Array<[string | null, string]>) =>
+      drawContent(
+        DOMPurify.sanitize(
+          `<section>${items.map(([key, text]) => `<p${key === null ? "" : ` data-markdown-key="${key}"`}>${text}</p>`).join("")}</section>`,
         ),
-        container,
       );
-    drawContent([
+    drawItems([
       ["keep", "retained"],
       ["duplicate", "first"],
       ["duplicate", "second"],
@@ -324,7 +362,7 @@ describe("streaming Markdown DOM", () => {
       ["3", "numeric string"],
     ]);
     const retained = container.querySelector("p");
-    drawContent([
+    drawItems([
       [null, "new"],
       ["duplicate", "second changes"],
       ["keep", "retained"],
@@ -341,7 +379,7 @@ describe("streaming Markdown DOM", () => {
       "empty changes",
     ]);
     expect(container.querySelector('[data-markdown-key="keep"]')).toBe(retained);
-    drawContent([
+    drawItems([
       ["duplicate", "now unique"],
       ["keep", "retained"],
       [null, "missing again"],
@@ -388,16 +426,15 @@ describe("streaming Markdown DOM", () => {
   );
 
   it("clears the canonical memo when a positional node becomes a media slot", () => {
+    const MediaButton = () => <button>Media</button>;
     const prepared = prepareMarkdownMedia(
       [{ type: "image", image: { url: "https://example.invalid/image.png" } }],
-      () => Object.assign(document.createElement("button"), { textContent: "Media" }),
+      MediaButton,
     );
-    const drawContent = (source: string) =>
-      render(renderMarkdownMedia(source, prepared.media, true), container);
-    drawContent("<p>Original</p>");
-    drawContent(prepared.markdown);
+    drawContent("<p>Original</p>", prepared.media);
+    drawContent(prepared.markdown, prepared.media);
     expect(container.querySelector("button")?.textContent).toBe("Media");
-    drawContent("<p>Original</p>");
+    drawContent("<p>Original</p>", prepared.media);
     expect(container.querySelector("p")?.textContent).toBe("Original");
     expect(container.querySelector("button")).toBeNull();
   });
@@ -415,41 +452,34 @@ describe("streaming Markdown DOM", () => {
     async ({ before, after, suffix }) => {
       let policy = "allowed";
       const connections: boolean[] = [];
-      const mediaContent = (props: Parameters<MarkdownMedia["render"]>[0]) => {
-        const button = document.createElement("button");
+      function MediaCard(props: Parameters<MarkdownMedia["render"]>[0]) {
         const presented = useContext(SolidContentPresentation);
-        let active = true;
-        createEffect(
-          () => {
-            void props.item;
-            return policy;
-          },
-          (value) => {
-            button.textContent = value;
-          },
-        );
-        createEffect(presented, (next) => {
-          if (next !== active) {
-            connections.push(next);
-          }
-          active = next;
-        });
-        onCleanup(() => {
+        let activated = false;
+        createEffect(presented, (active) => {
           if (active) {
-            connections.push(false);
+            if (activated) {
+              connections.push(true);
+            }
+            activated = true;
+            return () => connections.push(false);
           }
+          return undefined;
         });
-        return button;
-      };
+        const label = () => {
+          void props.item;
+          return policy;
+        };
+        return <button>{label()}</button>;
+      }
       const prepared = prepareMarkdownMedia(
         [
           { type: "text", text: before },
           { type: "image", image: { url: "https://example.invalid/image.png" } },
           ...(after ? [{ type: "text" as const, text: after }] : []),
         ],
-        mediaContent,
+        MediaCard,
       );
-      const part = draw(prepared.markdown, { media: prepared.media });
+      draw(prepared.markdown, { media: prepared.media });
       const paragraph = container.querySelector("p");
       const card = container.querySelector("button")!;
       expect(card.textContent).toBe("allowed");
@@ -470,12 +500,10 @@ describe("streaming Markdown DOM", () => {
       await Promise.resolve();
       expect(container.querySelector("button")).toBe(card);
       expect(card.textContent).toBe("denied");
-      part.setConnected(false);
-      flush();
+      presentMessage(false);
       expect(connections).toEqual([false]);
       expect(container.querySelector("button")).toBe(card);
-      part.setConnected(true);
-      flush();
+      presentMessage(true);
       expect(connections).toEqual([false, true]);
       expect(container.querySelector("button")).toBe(card);
       policy = "allowed again";
@@ -492,28 +520,23 @@ describe("streaming Markdown DOM", () => {
 
   it("leaves component-owned children intact and handles canonical changes", async () => {
     await import("../../../components/person-reference.ts");
-    const drawContent = (label: string, tail: string) => {
+    const drawMention = (label: string, tail: string) => {
       const source = `${label} ${tail}`;
-      render(
-        renderMarkdownMedia(
-          toSanitizedMarkdownHtml(source, {
-            humanMentions: [{ profileId: "test-person", start: 0, end: label.length }],
-          }),
-          undefined,
-          true,
-        ),
-        container,
+      drawContent(
+        toSanitizedMarkdownHtml(source, {
+          humanMentions: [{ profileId: "test-person", start: 0, end: label.length }],
+        }),
       );
     };
-    drawContent("@Alice", "growing");
+    drawMention("@Alice", "growing");
     const person = container.querySelector("openclaw-person-reference")!;
     await person.updateComplete;
     const button = person.querySelector("button");
     expect(button).not.toBeNull();
-    drawContent("@Alice", "growing text");
+    drawMention("@Alice", "growing text");
     expect(container.querySelector("openclaw-person-reference")).toBe(person);
     expect(person.querySelector("button")).toBe(button);
-    drawContent("@Bob", "new text");
+    drawMention("@Bob", "new text");
     const next = container.querySelector("openclaw-person-reference")!;
     await next.updateComplete;
     expect(next.querySelector("button")?.textContent).toContain("Bob");
@@ -521,27 +544,22 @@ describe("streaming Markdown DOM", () => {
   });
 
   it("retains enhanced Mermaid blocks until their canonical source changes", () => {
-    const drawContent = (label: string, tail: string) =>
-      render(
-        renderMarkdownMedia(
-          toSanitizedMarkdownHtml(
-            `\`\`\`mermaid\nflowchart LR\nA[${label}] --> B\n\`\`\`\n\n${tail}`,
-          ),
-          undefined,
-          true,
+    const drawDiagram = (label: string, tail: string) =>
+      drawContent(
+        toSanitizedMarkdownHtml(
+          `\`\`\`mermaid\nflowchart LR\nA[${label}] --> B\n\`\`\`\n\n${tail}`,
         ),
-        container,
       );
-    drawContent("First", "Growing");
+    drawDiagram("First", "Growing");
     const block = container.querySelector(".markdown-mermaid")!;
     // mountMermaidBlocks hands all children to the diagram renderer.
     const diagram = document.createElement("span");
     diagram.textContent = "Enhanced diagram";
     block.replaceChildren(diagram);
-    drawContent("First", "Growing text");
+    drawDiagram("First", "Growing text");
     expect(container.querySelector(".markdown-mermaid")).toBe(block);
     expect(block.firstChild).toBe(diagram);
-    drawContent("Second", "Updated");
+    drawDiagram("Second", "Updated");
     expect(container.querySelector(".markdown-mermaid code")?.textContent).toContain("Second");
     expect(diagram.isConnected).toBe(false);
   });
@@ -549,10 +567,7 @@ describe("streaming Markdown DOM", () => {
   it("keeps the sanitizer boundary and renders void elements without swallowing siblings", () => {
     const source =
       '- [x] Checked task\n\nBefore<br>After\n\n---\n\n![Preview](data:image/png;base64,iVBORw0KGgo=)\n\n<script>alert(1)</script><img onerror="alert(1)">';
-    render(
-      renderMarkdownMedia(toSanitizedMarkdownHtml(source, { remoteImages: true }), undefined, true),
-      container,
-    );
+    drawContent(toSanitizedMarkdownHtml(source, { remoteImages: true }));
     expect(container.querySelector("input")?.checked).toBe(true);
     expect(container.querySelector("br")).not.toBeNull();
     expect(container.querySelector("img")).not.toBeNull();
