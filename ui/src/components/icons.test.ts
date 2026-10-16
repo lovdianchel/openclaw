@@ -1,14 +1,15 @@
 /* @vitest-environment jsdom */
-import { render } from "lit";
+import { createComponent } from "solid-js";
 import { describe, expect, it } from "vitest";
-import { icons } from "./icons.ts";
+import { mountSolid } from "../test-helpers/mount-solid.ts";
+import { Icon } from "./solid/icon.tsx";
 
-describe("retained Lit icon callers", () => {
+describe("Solid icon reuse", () => {
   it("keeps reusable registry values", () => {
     const first = document.createElement("div");
     const second = document.createElement("div");
-    render(icons.copy, first);
-    render(icons.copy, second);
+    mountSolid(() => createComponent(Icon, { name: "copy" }), { container: first });
+    mountSolid(() => createComponent(Icon, { name: "copy" }), { container: second });
     expect(first.querySelector("svg")).not.toBe(second.querySelector("svg"));
     expect(first.querySelector("rect")?.getAttribute("width")).toBe("14");
   });

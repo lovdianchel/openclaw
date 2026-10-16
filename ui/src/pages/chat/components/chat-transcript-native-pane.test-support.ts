@@ -1,11 +1,10 @@
-import { html } from "lit";
 import type { Component } from "solid-js";
 import { solidContent } from "../../../lit/solid-content.tsx";
 
-/** ChatPaneRuntime still requires a Lit layout; its geometry fixture renders natively inside it. */
+/** Keep the geometry fixture owned by the pane layout content boundary. */
 export function nativePaneLayout<P extends Record<string, unknown>>(
   component: Component<P>,
   props: P,
 ) {
-  return html`${solidContent(component, props)}`;
+  return solidContent(component, props);
 }

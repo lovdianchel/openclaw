@@ -1,13 +1,12 @@
 /* @vitest-environment jsdom */
-import { render } from "lit";
 import { beforeEach, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import type { DurableQuestionDraft } from "../../../lib/chat/composer-draft-store.runtime.ts";
 import {
   createAsyncQuestionPanelProps,
   createAsyncQuestionPresentation,
-  renderAsyncQuestionSummary,
 } from "./chat-async-question.ts";
+import { render, renderAsyncQuestionSummary } from "./chat-message-native.test-support.tsx";
 import { getTranscriptState, resetThreadPresentation } from "./chat-thread-interactions.ts";
 
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), toast: vi.fn() }));

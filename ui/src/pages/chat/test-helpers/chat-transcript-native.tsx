@@ -6,9 +6,14 @@ import type { SolidController, SolidControllerHost } from "../../../lit/solid-co
 import { mountSolid } from "../../../test-helpers/mount-solid.ts";
 import { flush } from "../../../test-helpers/solid-settle.ts";
 import { createTestTranscript } from "../chat-view.test-helpers.ts";
-import type { ChatThreadProps } from "../components/chat-thread-interactions.ts";
+import {
+  closeTranscriptSearch,
+  getTranscriptState,
+  type ChatThreadProps,
+} from "../components/chat-thread-interactions.ts";
 import { ChatThread } from "../components/chat-thread-view.tsx";
 import type { ChatTranscriptController } from "../components/chat-transcript-controller.ts";
+import { TranscriptSearch } from "../components/chat-transcript-search.tsx";
 import type { ChatTranscriptSession } from "../components/chat-transcript-session.ts";
 import {
   flushDeferredRowPrune,
@@ -22,23 +27,68 @@ class ThreadFixture {
   ) {}
 }
 
-type NativeContent = JSX.Element | ThreadFixture;
+class SearchFixture {
+  readonly state;
+  readonly onClose;
+  constructor(
+    paneId: string,
+    readonly requestUpdate: () => void,
+  ) {
+    const state = getTranscriptState(paneId);
+    this.state = {
+      get searchOpen() {
+        return state.searchOpen;
+      },
+      get searchQuery() {
+        return state.searchQuery;
+      },
+      set searchQuery(value: string) {
+        state.searchQuery = value;
+      },
+      get searchFocusPending() {
+        return state.searchFocusPending;
+      },
+      set searchFocusPending(value: boolean) {
+        state.searchFocusPending = value;
+      },
+    };
+    this.onClose = () => closeTranscriptSearch(state, requestUpdate);
+  }
+}
+
+type NativeContent = JSX.Element | ThreadFixture | SearchFixture;
 const mounts = new WeakMap<HTMLElement, { update(value: NativeContent): void; unmount(): void }>();
 
 function Content(props: { value: NativeContent }) {
   const thread = () => (props.value instanceof ThreadFixture ? props.value : undefined);
+  const search = () => (props.value instanceof SearchFixture ? props.value : undefined);
   return (
     <>
       <Show when={thread()}>
         {(value) => <ChatThread props={value().props} transcript={value().transcript} />}
       </Show>
-      {props.value instanceof ThreadFixture ? undefined : props.value}
+      <Show when={search()}>
+        {(value) => (
+          <TranscriptSearch
+            state={value().state}
+            requestUpdate={value().requestUpdate}
+            onClose={value().onClose}
+          />
+        )}
+      </Show>
+      {props.value instanceof ThreadFixture || props.value instanceof SearchFixture
+        ? undefined
+        : props.value}
     </>
   );
 }
 
 export function renderChatThread(props: ChatThreadProps, transcript: ChatTranscriptController) {
   return new ThreadFixture(props, transcript);
+}
+
+export function renderTranscriptSearch(paneId: string, requestUpdate: () => void) {
+  return new SearchFixture(paneId, requestUpdate);
 }
 
 /** Retain native components between commits, including moves of session-owned row roots. */

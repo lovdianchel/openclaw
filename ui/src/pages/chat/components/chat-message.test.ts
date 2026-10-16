@@ -1,6 +1,5 @@
 /* @vitest-environment jsdom */
 
-import { html, nothing, render } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectAgentToolActivity } from "../../../../../src/infra/agent-activity-events.js";
 import * as markdown from "../../../components/markdown.ts";
@@ -14,11 +13,15 @@ import { attachHistoryActivity } from "../chat-history-request.ts";
 import { buildCachedChatItems } from "../chat-thread.ts";
 import { agentEvent, createHost } from "../tool-stream.test-helpers.ts";
 import { handleAgentEvent } from "../tool-stream.ts";
-import { renderChatNotice } from "./chat-divider.ts";
 import { dismissConfirmedActionPopovers } from "./chat-message-confirmation.ts";
-import { renderActivityGroup, renderMessageGroup } from "./chat-message-group.test-support.ts";
 import { releaseChatMediaResourceSubscriber } from "./chat-message-media.ts";
-import { renderStreamGroup } from "./chat-message-stream.test-support.ts";
+import {
+  render,
+  renderChatNotice,
+  renderActivityGroup,
+  renderMessageGroup,
+  renderStreamGroup,
+} from "./chat-message-native.test-support.tsx";
 import {
   createAssistantMessage,
   createCanvasPreview,
@@ -255,7 +258,10 @@ function renderMessageGroups(
   opts: Partial<RenderMessageGroupOptions> = {},
   container: HTMLElement = view,
 ) {
-  render(html`${groups.map((group) => renderTestMessageGroup(group, opts))}`, container);
+  render(
+    groups.map((group) => renderTestMessageGroup(group, opts)),
+    container,
+  );
 }
 
 function clearConfirmedActionSkip() {
@@ -471,11 +477,14 @@ function renderNotices(host: ReturnType<typeof createHost>, runId: string, paneI
   if (!items.length || !items.every((item) => item.kind === "notice")) {
     throw new Error("Expected notice projections");
   }
-  render(html`${items.map((item) => renderChatNotice(item))}`, view);
+  render(
+    items.map((item) => renderChatNotice(item)),
+    view,
+  );
 }
 
 afterEach(() => {
-  render(nothing, view);
+  render(null, view);
   view.remove();
   // These detached render fixtures own the callbacks a live chat pane normally releases.
   for (const subscriber of mediaSubscribers) {

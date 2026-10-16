@@ -1,17 +1,17 @@
 /* @vitest-environment jsdom */
 
 import { expectDefined } from "@openclaw/normalization-core";
-import { html, LitElement } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import { resetChatViewState } from "../chat-view-state.ts";
-import type { SidebarFullMessageLoader } from "./chat-sidebar-content-types.ts";
 import {
+  TranscriptTestHost,
+  render,
+  renderChatThread,
   renderTranscriptSearch,
-  toggleTranscriptSearch,
-  type ChatThreadProps,
-} from "./chat-thread-interactions.ts";
-import { renderChatThread } from "./chat-thread.test-support.ts";
+} from "../test-helpers/chat-transcript-native.tsx";
+import type { SidebarFullMessageLoader } from "./chat-sidebar-content-types.ts";
+import { toggleTranscriptSearch, type ChatThreadProps } from "./chat-thread-interactions.ts";
 import { ChatTranscriptController } from "./chat-transcript-controller.ts";
 import {
   flushDeferredRowPrune,
@@ -33,29 +33,41 @@ function fullMessage(content: string): FullMessageResult {
   return { ok: true, message: { role: "assistant", content } };
 }
 
-class RecoveryTranscriptElement extends LitElement {
+class RecoveryTranscriptElement extends TranscriptTestHost {
   props: ChatThreadProps = threadProps("recovery-pane");
   resetPresentationOnDisconnect = true;
   private readonly transcript = new ChatTranscriptController(this, () => this.props.paneId);
 
-  override createRenderRoot() {
-    return this;
-  }
-
-  override render() {
+  override renderTranscript = () => {
     const requestUpdate = () => this.requestUpdate();
-    return html`
-      ${renderTranscriptSearch(this.props.paneId, requestUpdate)}
-      ${renderChatThread({ ...this.props, onRequestUpdate: requestUpdate }, this.transcript)}
-    `;
-  }
+    const search = this.contents.querySelector<HTMLElement>(".recovery-search");
+    const thread = this.contents.querySelector<HTMLElement>(".recovery-thread");
+    if (search && thread) {
+      render(renderTranscriptSearch(this.props.paneId, requestUpdate), search);
+      render(
+        renderChatThread({ ...this.props, onRequestUpdate: requestUpdate }, this.transcript),
+        thread,
+      );
+    }
+    return this.contents;
+  };
+
+  private readonly contents = (() => {
+    const container = document.createElement("div");
+    const search = container.appendChild(document.createElement("div"));
+    search.className = "recovery-search";
+    const thread = container.appendChild(document.createElement("div"));
+    thread.className = "recovery-thread";
+    return container;
+  })();
 
   override disconnectedCallback() {
-    // Match the pane-specific production reset before Lit disconnects controllers.
+    // Match the pane-specific production reset before disconnecting controllers.
     if (this.resetPresentationOnDisconnect) {
       resetChatViewState(this.props.paneId);
     }
-    super.disconnectedCallback();
+    // Retain the native row roots so reconnection proves controller invalidation.
+    this.transcript.hostDisconnected();
   }
 }
 
@@ -179,7 +191,7 @@ describe("chat transcript full-message recovery", () => {
   });
 
   it.each(["loading", "loaded"] as const)(
-    "retires %s recovery when the same Lit controller reconnects",
+    "retires %s recovery when the same transcript controller reconnects",
     async (phase) => {
       const retired = createDeferred<FullMessageResult>();
       const current = createDeferred<FullMessageResult>();
@@ -194,7 +206,7 @@ describe("chat transcript full-message recovery", () => {
         await vi.waitFor(() => expect(pane.textContent).toContain("Retired body."));
       }
 
-      // Keep Lit's guarded rows and pane state so only the controller owns invalidation.
+      // Keep retained rows and pane state so only the controller owns invalidation.
       pane.resetPresentationOnDisconnect = false;
       pane.remove();
       document.body.append(pane);

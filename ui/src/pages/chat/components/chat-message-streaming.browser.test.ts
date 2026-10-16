@@ -1,6 +1,5 @@
 import DOMPurify from "dompurify";
-import { html, nothing, render } from "lit";
-import { AsyncDirective, directive } from "lit/async-directive.js";
+import { createEffect, onCleanup, useContext } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import {
@@ -11,10 +10,16 @@ import { markdownBlocksRef } from "../../../components/markdown-element-refs-sol
 import type { MarkdownRenderOptions } from "../../../components/markdown-render-options.ts";
 import { releaseMarkdownTables } from "../../../components/markdown-tables.ts";
 import { toSanitizedMarkdownHtml } from "../../../components/markdown.ts";
+import { SolidContentPresentation, solidContent } from "../../../lit/solid-content.tsx";
 import { renderSolidRef } from "../../../test-helpers/render-solid-ref.ts";
 import { flush } from "../../../test-helpers/solid-settle.ts";
 import { prepareMarkdownMedia, type MarkdownMedia } from "./chat-message-media-markdown.ts";
-import { renderMarkdownMedia, renderMessageMarkdown } from "./chat-message-text.test-support.ts";
+import {
+  render,
+  renderMarkdownMedia,
+  renderMessageMarkdown,
+  renderMarkdownSection,
+} from "./chat-message-native.test-support.tsx";
 
 let container: HTMLDivElement;
 let blocks: ReturnType<typeof renderSolidRef>;
@@ -28,7 +33,7 @@ beforeEach(() => {
 afterEach(() => {
   releaseMarkdownTables(container);
   container.removeEventListener("click", handleMarkdownCodeBlockClick);
-  render(nothing, container);
+  render(null, container);
   blocks.unmount();
   container.remove();
 });
@@ -48,16 +53,16 @@ function draw(
   } = {},
 ) {
   return render(
-    html`<section>
-      ${renderMessageMarkdown(
+    renderMarkdownSection(
+      renderMessageMarkdown(
         source,
         key,
         { role: "assistant", isStreaming: streaming },
         { codeBlockInteraction: "interactive", tableInteractions: "enabled", ...options },
         undefined,
         media,
-      )}
-    </section>`,
+      ),
+    ),
     container,
   );
 }
@@ -389,7 +394,11 @@ describe("streaming Markdown DOM", () => {
   it("clears the canonical memo when a positional node becomes a media slot", () => {
     const prepared = prepareMarkdownMedia(
       [{ type: "image", image: { url: "https://example.invalid/image.png" } }],
-      () => html`<button>Media</button>`,
+      () => {
+        const button = document.createElement("button");
+        button.textContent = "Media";
+        return button;
+      },
     );
     const drawContent = (source: string) =>
       render(renderMarkdownMedia(source, prepared.media, true), container);
@@ -414,28 +423,34 @@ describe("streaming Markdown DOM", () => {
     async ({ before, after, suffix }) => {
       let policy = "allowed";
       const connections: boolean[] = [];
-      const mediaContent = directive(
-        class extends AsyncDirective {
-          render(label: string) {
-            return html`<button>${label}</button>`;
-          }
-          protected override disconnected() {
-            connections.push(false);
-          }
-          protected override reconnected() {
-            connections.push(true);
-          }
-        },
-      );
+      function MediaContent(props: { label: string }) {
+        const presented = useContext(SolidContentPresentation);
+        const button = document.createElement("button");
+        let initial = true;
+        createEffect(
+          () => props.label,
+          (label) => {
+            button.textContent = label;
+          },
+        );
+        createEffect(presented, (connected) => {
+          if (initial) initial = false;
+          else connections.push(connected);
+        });
+        onCleanup(() => {
+          if (presented()) connections.push(false);
+        });
+        return button;
+      }
       const prepared = prepareMarkdownMedia(
         [
           { type: "text", text: before },
           { type: "image", image: { url: "https://example.invalid/image.png" } },
           ...(after ? [{ type: "text" as const, text: after }] : []),
         ],
-        () => mediaContent(policy),
+        () => solidContent(MediaContent, { label: policy }),
       );
-      const part = draw(prepared.markdown, { media: prepared.media });
+      const part = draw(prepared.markdown, { media: prepared.media })!;
       const paragraph = container.querySelector("p");
       const card = container.querySelector("button")!;
       expect(card.textContent).toBe("allowed");

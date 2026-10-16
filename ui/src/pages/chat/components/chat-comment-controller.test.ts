@@ -1,19 +1,23 @@
-import { nothing, render } from "lit";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { ChatAttachment } from "../../../lib/chat/chat-types.ts";
 import { waitForSolid } from "../../../test-helpers/solid-settle.ts";
-import "../../../lib/toast-host.ts";
 import {
   getChatAttachmentDataUrl,
   releaseChatAttachmentPayload,
 } from "../attachment-payload-store.ts";
+import "../../../lib/toast-host.ts";
 import { createComposerContainer } from "../chat-composer.test-support.ts";
-import { renderChat } from "../chat-view-render.test-support.ts";
 import { createChatProps } from "../chat-view.test-helpers.ts";
+import { ChatView, type ChatProps } from "../chat-view.tsx";
 import type { ChatAttachmentControlsProps } from "./chat-attachment-controls.types.ts";
+import { nativeView, render } from "./chat-message-native.test-support.tsx";
 import "./chat-comment-controller.ts";
-import { renderChatSelectionAnnotations } from "./chat-selection-annotations.ts";
+import { ChatSelectionAnnotations } from "./chat-selection-annotations.tsx";
 import { createChatSelectionAttachment } from "./chat-selection-attachment.ts";
+
+const renderChat = (props: ChatProps) => nativeView(ChatView, { props });
+const renderChatSelectionAnnotations = (props: ChatAttachmentControlsProps) =>
+  nativeView(ChatSelectionAnnotations, props);
 
 const payloads = new Set<string>();
 type CommentControllerElement = HTMLElement & {
@@ -112,7 +116,7 @@ describe("comment actions outside the transcript", () => {
   it("keeps an editor across draft renders and retires it when composition is disabled", async () => {
     const container = createComposerContainer();
     onTestFinished(() => {
-      render(nothing, container);
+      render(null, container);
     });
     document.body.append(container);
     const attachment: ChatAttachment = {

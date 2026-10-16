@@ -1,8 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { expectDefined } from "@openclaw/normalization-core";
-import { html, render } from "lit";
-import { createComponent, createSignal } from "solid-js";
+import { createComponent, createSignal, merge } from "solid-js";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { createDeferred } from "../../../../test/helpers/promise.js";
 import type { GatewayBrowserClient, GatewayHelloOk } from "../../api/gateway.ts";
@@ -24,6 +23,7 @@ import type {
 } from "../../lib/sessions/patch.ts";
 import { createTestSessionCapability } from "../../lib/sessions/session-capability.test-support.ts";
 import { areUiSessionKeysEquivalent } from "../../lib/sessions/session-key.ts";
+import { solidContent } from "../../lit/solid-content.tsx";
 import {
   createModelCatalog,
   createSessionsListResult,
@@ -55,7 +55,6 @@ import * as chatProgress from "./chat-progress.ts";
 import { switchChatModel, switchChatSetting } from "./chat-session.ts";
 import { groupMessages } from "./chat-thread-grouping.ts";
 import * as chatThread from "./chat-thread.ts";
-import { renderChat } from "./chat-view-render.test-support.ts";
 import { resetChatViewState } from "./chat-view-state.ts";
 import {
   appendChatBubble,
@@ -70,6 +69,8 @@ import {
   createPasteEvent,
   createTestTranscript,
   renderChatInto,
+  renderChatPropsInto,
+  disposeChatView,
   renderChatView,
   getComposerTextarea,
   requireElement,
@@ -85,7 +86,7 @@ import {
 } from "./chat-view.test-helpers.ts";
 import * as chatMessageConfirmation from "./components/chat-message-confirmation.ts";
 import { renderChatModelAccountControl } from "./components/chat-model-account-control.ts";
-import { renderChatModelControls } from "./components/chat-model-controls.tsx";
+import { ChatModelControls } from "./components/chat-model-controls.tsx";
 import { installChatComposerPickerDismissal } from "./components/chat-picker-overlay.ts";
 import {
   resetThreadPresentation,
@@ -491,7 +492,7 @@ function createReasoningHeaderState(options: { models: ModelCatalogEntry[] }) {
   return result;
 }
 
-type ChatModelControlsProps = Parameters<typeof renderChatModelControls>[0];
+type ChatModelControlsProps = Parameters<typeof ChatModelControls>[0];
 
 function createChatModelControlsProps(state: ChatHeaderTestState): ChatModelControlsProps {
   const selectedSession = state.sessionsResult?.sessions.find((row) =>
@@ -535,16 +536,33 @@ function createChatModelControlsProps(state: ChatHeaderTestState): ChatModelCont
   };
 }
 
+const mountedModelControls = new WeakMap<HTMLElement, (props: ChatModelControlsProps) => void>();
+
 function renderModelControls(
   state: ChatHeaderTestState,
   overrides: Partial<ChatModelControlsProps> = {},
   container = document.createElement("div"),
 ) {
-  render(
-    renderChatModelControls({ ...createChatModelControlsProps(state), ...overrides }),
-    container,
-  );
+  const next = { ...createChatModelControlsProps(state), ...overrides };
+  const update = mountedModelControls.get(container);
+  if (update) {
+    update(next);
+  } else {
+    const [props, setProps] = createSignal(next);
+    mountSolid(() => createComponent(ChatModelControls, merge(props)), { container });
+    mountedModelControls.set(container, setProps);
+    onTestFinished(() => mountedModelControls.delete(container));
+  }
+  flush();
   return container;
+}
+
+function ModelControlFixture() {
+  return Object.assign(document.createElement("button"), {
+    className: "chat-composer-model-control",
+    type: "button",
+    textContent: "Model",
+  });
 }
 
 describe("chat typing status", () => {
@@ -1898,9 +1916,7 @@ describe("chat loading skeleton", () => {
   it("shows prompt-bar progress beside context usage while the current session send is awaiting acknowledgement", () => {
     const container = renderChatView({
       sending: true,
-      composerControls: html`<button class="chat-composer-model-control" type="button">
-        Model
-      </button>`,
+      composerControls: solidContent(ModelControlFixture, {}),
       queue: [createPendingSend()],
       selectedSession: createContextUsageSessions().sessions[0],
     });
@@ -2033,9 +2049,7 @@ describe("chat loading skeleton", () => {
     try {
       const container = renderChatView({
         messages: [{ role: "assistant", content: "Partial response" }],
-        composerControls: html`<button class="chat-composer-model-control" type="button">
-          Model
-        </button>`,
+        composerControls: solidContent(ModelControlFixture, {}),
         runStatus: {
           phase: "interrupted",
           runId: "run-1",
@@ -2273,10 +2287,10 @@ describe("chat composer render invalidation", () => {
     });
     const onRequestUpdate = vi.fn(() => {
       props = { ...props, draft, getDraft: () => draft };
-      render(renderChat(props), container);
+      renderChatPropsInto(container, props);
     });
     props = { ...props, onRequestUpdate };
-    render(renderChat(props), container);
+    renderChatPropsInto(container, props);
 
     const textarea = getComposerTextarea(container);
     onRequestUpdate.mockClear();
@@ -2298,7 +2312,7 @@ describe("chat composer render invalidation", () => {
     expect(chatThread.buildCachedChatItems).not.toHaveBeenCalled();
     expect(textarea.dir).toBe("rtl");
 
-    render(renderChat(props), container);
+    renderChatPropsInto(container, props);
     expect(getComposerTextarea(container).dir).toBe("rtl");
   });
 });
@@ -4900,7 +4914,7 @@ describe("right-click Reply", () => {
       );
     } finally {
       transcript.hostDisconnected();
-      render(null, container);
+      disposeChatView(container);
       container.remove();
     }
   });
@@ -4923,10 +4937,11 @@ describe("right-click Reply", () => {
       let target: HTMLElement = bubble;
       if (mode === "linked image") {
         const preview = bubble.appendChild(document.createElement("div"));
-        render(
-          html`<a href="https://example.com"><img src="/example.png" alt="Example" /></a>`,
-          preview,
+        const link = Object.assign(document.createElement("a"), { href: "https://example.com" });
+        link.append(
+          Object.assign(document.createElement("img"), { src: "/example.png", alt: "Example" }),
         );
+        preview.append(link);
         target = expectDefined(preview.querySelector("img"), "linked image");
       } else if (mode === "streaming") {
         bubble.classList.add("streaming");

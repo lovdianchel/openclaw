@@ -1,6 +1,5 @@
 /* @vitest-environment jsdom */
 
-import { html, nothing, render } from "lit";
 import { afterEach, expect, it, vi } from "vitest";
 import { createDeferred } from "../../../../../test/helpers/promise.js";
 import type { ChatQueueItem } from "../../../lib/chat/chat-types.ts";
@@ -8,15 +7,19 @@ import { rememberLiveTerminalRun } from "../terminal-message-identity.ts";
 import {
   createAsyncQuestionPresentation,
   createAsyncQuestionPanelProps,
-  renderAsyncQuestionSummary,
   readAsyncQuestions,
 } from "./chat-async-question.ts";
 import type { AsyncQuestionDraft } from "./chat-async-question.types.ts";
+import {
+  render,
+  renderAsyncQuestionSummary,
+  renderQuestionPanel,
+} from "./chat-message-native.test-support.tsx";
 import "./chat-question-panel.tsx";
 
 const container = document.createElement("div");
 afterEach(() => {
-  render(nothing, container);
+  render(null, container);
   container.remove();
 });
 
@@ -304,9 +307,7 @@ it.each(["answered", "failed"] as const)(
       render(
         state.asyncQuestionDrafts.get(questions.itemId)?.status === "submitted"
           ? renderAsyncQuestionSummary(questions, presentation)
-          : html`<openclaw-chat-question-panel
-              .props=${createAsyncQuestionPanelProps(questions, presentation, {})}
-            ></openclaw-chat-question-panel>`,
+          : renderQuestionPanel(createAsyncQuestionPanelProps(questions, presentation, {})),
         container,
       );
     };
@@ -321,7 +322,7 @@ it.each(["answered", "failed"] as const)(
       undefined,
     );
 
-    render(nothing, container);
+    render(null, container);
     draw();
     await vi.waitFor(() =>
       expect(container.querySelector(".chat-question-panel__advance")).not.toBeNull(),

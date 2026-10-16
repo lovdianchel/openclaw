@@ -1,6 +1,5 @@
 /* @vitest-environment jsdom */
 import { expectDefined } from "@openclaw/normalization-core/expect";
-import { html, nothing, render } from "lit";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { resolveThemeBranding } from "../../../../../packages/gateway-protocol/src/theme.ts";
 import { resolveControlUiAuthToken } from "../../../app/control-ui-auth.ts";
@@ -21,14 +20,14 @@ import {
 } from "../chat-thread.ts";
 import { createTestTranscript } from "../chat-view.test-helpers.ts";
 import { saveChatSessionScrollPosition } from "../scroll.ts";
+import {
+  render,
+  renderChatThread,
+  renderTranscriptSearch,
+} from "../test-helpers/chat-transcript-native.tsx";
 import * as chatMessage from "./chat-message-group-frame.ts";
 import { releaseChatMediaResourceSubscriber } from "./chat-message-media.ts";
-import {
-  renderTranscriptSearch,
-  resetTranscriptSession,
-  toggleTranscriptSearch,
-} from "./chat-thread-interactions.ts";
-import { renderChatThread } from "./chat-thread.test-support.ts";
+import { resetTranscriptSession, toggleTranscriptSearch } from "./chat-thread-interactions.ts";
 import { settleToolBridges } from "./chat-tool-render.test-support.ts";
 import { projectChatTranscript } from "./chat-transcript-projection.ts";
 import {
@@ -78,7 +77,7 @@ describe("chat transcript invalidation", () => {
         expect(container.querySelector(".identity-avatar__hat")).toBeNull();
       } finally {
         setCurrentThemeBranding(previousBranding);
-        render(nothing, container);
+        render(null, container);
         transcript.hostDisconnected();
       }
     },
@@ -235,7 +234,7 @@ describe("chat transcript invalidation", () => {
       transcript.hostConnected();
     });
     afterEach(() => {
-      render(nothing, container);
+      render(null, container);
       transcript.hostDisconnected();
     });
     async function renderPreview() {
@@ -374,7 +373,7 @@ describe("chat transcript invalidation", () => {
       const project = () =>
         transcript.renderSession(sessionKey, (session) => {
           projectChatTranscript(props, session);
-          return html``;
+          return null;
         });
       project();
 

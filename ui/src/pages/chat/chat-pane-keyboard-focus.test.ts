@@ -1,8 +1,8 @@
 /* @vitest-environment jsdom */
 
-import { html, render } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import { getRenderedModalDialog, installDialogPolyfill } from "../../test-helpers/modal-dialog.ts";
+import { mountSolid } from "../../test-helpers/mount-solid.ts";
 import {
   createGatewayBrowserClientFixture,
   createSessionCapabilityFixture,
@@ -11,7 +11,7 @@ import {
 import {
   configureNativeKeyTarget,
   nativeControlNavigationCases,
-} from "./test-helpers/chat-scroll-input.ts";
+} from "./test-helpers/chat-scroll-input.tsx";
 
 function createFocusedPane() {
   const { pane } = createTestChatPane({
@@ -29,15 +29,30 @@ function createFocusedPane() {
 
 describe("chat pane keyboard focus", () => {
   it.each([
-    ["range", "Home", html`<input type="range" />`, false],
-    ["input", "ArrowUp", html`<input />`, false],
+    [
+      "range",
+      "Home",
+      () => Object.assign(document.createElement("input"), { type: "range" }),
+      false,
+    ],
+    ["input", "ArrowUp", () => document.createElement("input"), false],
     [
       "handled widget",
       "PageUp",
-      html`<div @keydown=${(event: KeyboardEvent) => event.preventDefault()}>Widget</div>`,
+      () => {
+        const widget = document.createElement("div");
+        widget.textContent = "Widget";
+        widget.addEventListener("keydown", (event) => event.preventDefault());
+        return widget;
+      },
       false,
     ],
-    ["transcript", "Home", html`<span>History</span>`, true],
+    [
+      "transcript",
+      "Home",
+      () => Object.assign(document.createElement("span"), { textContent: "History" }),
+      true,
+    ],
     ...nativeControlNavigationCases
       .filter((testCase) => {
         const [name, key] = testCase;
@@ -73,7 +88,7 @@ describe("chat pane keyboard focus", () => {
       pane.historyAutoLoadBlocked = true;
       vi.stubGlobal("IntersectionObserver", undefined);
       const thread = document.createElement("div");
-      render(content, thread);
+      mountSolid(content, { container: thread });
       const restorePlatform = configureNativeKeyTarget(thread.firstElementChild!, fixture);
       thread.addEventListener("keydown", (event) => pane.handleTranscriptHistoryIntent(event));
       try {
