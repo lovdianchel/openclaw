@@ -385,11 +385,15 @@ export function collectIosScreenshotEvidence({
     .filter((entry) => entry.isFile() && entry.name.endsWith(".png"))
     .map((entry) => entry.name)
     .toSorted();
-  const expectedPngs = screenshots.map((entry) => path.posix.basename(entry.artifactPath)).toSorted();
+  const expectedPngs = screenshots
+    .map((entry) => path.posix.basename(entry.artifactPath))
+    .toSorted();
   if (actualPngs.join("\n") !== expectedPngs.join("\n")) {
     fail("combined screenshot PNG union mismatch");
   }
-  const expectedXcresults = captures.map((entry) => path.posix.basename(entry.artifactPath)).toSorted();
+  const expectedXcresults = captures
+    .map((entry) => path.posix.basename(entry.artifactPath))
+    .toSorted();
   if (
     captureSource.xcresultNames.toSorted().join("\n") !== expectedXcresults.join("\n") ||
     captureSource.ledgerEntries.length !== captures.length

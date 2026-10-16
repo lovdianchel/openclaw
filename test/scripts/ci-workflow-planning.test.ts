@@ -2546,7 +2546,11 @@ describe("ci workflow guards", () => {
         runAttempt: 1,
         preflightOutputs: manifest.outputs,
       };
-      for (const job of ["ios-screenshot-capture", "ios-screenshot-evidence", "checks-node-compat"]) {
+      for (const job of [
+        "ios-screenshot-capture",
+        "ios-screenshot-evidence",
+        "checks-node-compat",
+      ]) {
         const expression = workflow.jobs[job].if;
         expect(
           evaluateWorkflowExpression(
@@ -12145,10 +12149,14 @@ describe("ci workflow guards", () => {
   it("captures all iOS families in one native job and retains phase timings", () => {
     const capture = readCiWorkflow().jobs["ios-screenshot-capture"];
     expect(capture.strategy).toBeUndefined();
-    const step = capture.steps.find((candidate: WorkflowStep) => candidate.id === "device_screenshots");
+    const step = capture.steps.find(
+      (candidate: WorkflowStep) => candidate.id === "device_screenshots",
+    );
     expect(step.run).toBe("pnpm ios:screenshots");
     expect(step.env).toEqual({ OPENCLAW_SNAPSHOT_DIAGNOSTICS: "1" });
-    const diagnostics = capture.steps.find((candidate: WorkflowStep) => candidate.name === "Upload iOS screenshot timing diagnostics");
+    const diagnostics = capture.steps.find(
+      (candidate: WorkflowStep) => candidate.name === "Upload iOS screenshot timing diagnostics",
+    );
     expect(diagnostics.if).toBe("always()");
     expect(diagnostics.with.path).toBe("apps/ios/build/screenshot-diagnostics.json");
   });
