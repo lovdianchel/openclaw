@@ -129,11 +129,8 @@ export function listSqliteSchemaInputs(): SqliteSchemaInput[] {
   add("state-retired-commitments", "state", RETIRED_COMMITMENTS_SCHEMA_SQL);
   add("state-retired-commitments-shipped", "state", SHIPPED_RETIRED_COMMITMENTS_SCHEMA_SQL);
 
-  // v1 predates sessions; supported session layouts begin at v8. Equal targets share one input.
-  for (const version of [
-    1,
-    ...Array.from({ length: OPENCLAW_AGENT_SCHEMA_VERSION - 7 }, (_, index) => index + 8),
-  ]) {
+  // Pre-v8 stores are supported without legacy session tables. Equal targets share one input.
+  for (let version = 1; version <= OPENCLAW_AGENT_SCHEMA_VERSION; version += 1) {
     add(`agent-version-${version}`, "agent", getOpenClawAgentMigrationSchema(version));
   }
   for (const [id, sql] of [

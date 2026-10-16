@@ -54,12 +54,9 @@ describe("generated SQLite schema catalogs", () => {
       }
     }
 
-    // v1 non-session databases remain supported; released session layouts start at v8.
+    // Pre-v8 non-session databases remain supported; released session layouts start at v8.
     // These are the expected-definition contracts, not fabricated historical stores.
-    for (const version of [
-      1,
-      ...Array.from({ length: OPENCLAW_AGENT_SCHEMA_VERSION - 7 }, (_, index) => index + 8),
-    ]) {
+    for (let version = 1; version <= OPENCLAW_AGENT_SCHEMA_VERSION; version += 1) {
       requireCatalog(getOpenClawAgentMigrationSchema(version), `agent v${version}`);
     }
   });

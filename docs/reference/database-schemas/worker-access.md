@@ -2318,7 +2318,7 @@ agent-deletion facts in the existing schema inspection worker. Boot and Doctor
 retain their native admission callbacks. The preflight owner keeps the captured
 snapshot until inspection and child cleanup settle; snapshot staging locks retain
 their native owner. Canonical comparison contracts come from build-generated
-SQLite catalogs, loaded per store without constructing a scratch database or
+SQLite catalogs, materialized on first use per store without constructing a scratch database or
 transferring contracts between processes. Version facts stay within their unchanged
 snapshot. Each request rereads stored facts. Schemas, stored bytes, and update
 behavior are unchanged.
