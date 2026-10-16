@@ -98,6 +98,10 @@ outside the transaction can refresh those facts through the existing owner.
 Native SQLite initialization reads the loaded library's version and extension
 capability in one query before admitting real state databases. Auth-profile
 readers install their lock-wait timeout at connection open.
+On first Gateway startup, a version-zero database containing only recognized
+native bootstrap tables is completed before runtime history is read. This uses
+the existing schema owner and preserves the native rows; it does not repair
+historical installations during ordinary startup.
 Quarantine decision readers and writers set their existing lock-wait timeout at connection
 open. The quarantine store's format and each target's decision are loaded once
 per physical store. Record and clear operations publish the committed decision
@@ -147,11 +151,9 @@ old. A hit skips startup snapshot, readiness, schema, and integrity inspection,
 including post-ready scans. The plain checksum-protected write needs no rename
 or fsync protocol; an incomplete seal falls back to full validation.
 
-Admitted facts belong to the physical store for the process lifetime and are
-shared with all workers and handles, including after the final handle closes.
-Write receipts and explicit invalidation, such as quarantine or maintenance,
-refresh the affected facts. Clean-close seals restore validated facts across
-process restarts without SQL.
+Admitted facts are shared with all workers and handles while the database is open.
+Final close releases their in-memory payloads; a clean-close seal restores validated
+facts on reopen without SQL. A close that cannot seal requires fresh admission.
 File identity uses volume, inode, and stable
 birthtime captured once with `fstat` on the retained admission descriptor, not SQL.
 Admission lookups and established borrowers reuse those shared facts without
@@ -189,6 +191,14 @@ The shared-state reader pool keeps its first worker warm for the normal handle
 idle timeout. Surplus readers retire after 30 seconds idle and restart on demand.
 Retirement uses the pool's existing task and native-resource settlement so an
 active read or retained lease is not interrupted.
+
+Durable usage refreshes publish rollups in bounded transactions instead of one
+writer request per transcript. A batch flushes after 50 transcripts, 1 MiB of
+prepared payload, or one second of scanning, checked between whole transcripts;
+one large transcript may exceed the byte or time limit. Refresh completion always
+flushes the remaining batch. Fresh checkpoints remain untouched, and a failed or
+canceled scan leaves uncommitted derived totals for the next refresh. Persisted
+rollups, partitions, schemas, and report totals keep their existing format.
 
 Transcript history and search lanes likewise retire surplus workers after 30
 seconds idle. Each lane keeps one worker until its existing five-minute idle

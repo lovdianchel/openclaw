@@ -91,10 +91,10 @@ function useRoster(props: RosterProps) {
     host();
     return store().snapshot;
   }, presented);
+  const cached = createMemo(() => cachedRosterCards(host()));
   const cards = createParkedProjection(() => {
-    const cached = cachedRosterCards(host());
-    if (cached) {
-      return cached;
+    if (cached()) {
+      return cached()!;
     }
     const currentContext = context();
     return snapshot().cards.map((card) =>
@@ -320,7 +320,7 @@ export function SidebarAgentRoster(props: RosterProps) {
                         get agentId() {
                           return card().id;
                         },
-                        className: "sidebar-agent-roster__action sidebar-agent-roster__new",
+                        class: "sidebar-agent-roster__action sidebar-agent-roster__new",
                         get label() {
                           return `${t("agentChip.newConversation")}: ${card().name}`;
                         },

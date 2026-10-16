@@ -238,6 +238,60 @@ describe("native SQLite schema snapshots and callbacks", () => {
     ).toBe(false);
   });
 
+  it("keeps unread captured scopes immutable through discovery and local install", () => {
+    const location = path.join(tempDirs.make("sqlite-scope-snapshots-"), "proof.sqlite");
+    const database = openDatabase("CREATE TABLE proof(value)", true, location);
+    const firstToken = readSqliteDatabaseScopedWriteToken(database, "first");
+    const [before] = captureSqliteDatabaseAdmissions(undefined, { location });
+    const cursor = createSqliteDatabaseAdmissionCursor();
+    captureSqliteDatabaseAdmissions(cursor, { location });
+
+    readSqliteDatabaseScopedWriteToken(database, "second");
+    const [delta] = captureSqliteDatabaseAdmissions(cursor, { location });
+    expect([...delta!.writeScopes.keys()]).toEqual(['["key","second"]']);
+    // The old snapshot has not read its scope map, including through structured clone.
+    const cloned = structuredClone(before!);
+    expect([...cloned.writeScopes.keys()]).toEqual(['["key","first"]']);
+    expect(readSqliteDatabaseScopedWriteToken(database, "first")).toBe(firstToken);
+
+    const receiver = new SqliteDatabaseAdmissionRegistry();
+    receiver.install([before!]);
+    receiver.install([delta!]);
+    expect([...before!.writeScopes.keys()]).toEqual(['["key","first"]']);
+    const received = receiver.capture()[0]!;
+    expect([...received.writeScopes.keys()].toSorted()).toEqual([
+      '["key","first"]',
+      '["key","second"]',
+    ]);
+    // Restore the process owner's bootstrap after the isolated registry publication.
+    captureSqliteDatabaseAdmissions();
+  });
+
+  it("reclaims another isolate's retired metadata at the next publication", () => {
+    const root = tempDirs.make("sqlite-retired-publication-");
+    const first = openDatabase("CREATE TABLE proof(value)", true, path.join(root, "first.sqlite"));
+    const second = openDatabase(
+      "CREATE TABLE proof(value)",
+      true,
+      path.join(root, "second.sqlite"),
+    );
+    const firstSnapshot = captureSqliteDatabaseAdmissions(undefined, {
+      location: first.location()!,
+    })[0]!;
+    const secondSnapshot = captureSqliteDatabaseAdmissions(undefined, {
+      location: second.location()!,
+    })[0]!;
+    const receiver = new SqliteDatabaseAdmissionRegistry();
+    receiver.install(structuredClone([firstSnapshot, secondSnapshot]));
+    try {
+      first.close();
+      receiver.publish(receiver.records.get(secondSnapshot.identity)!);
+      expect(receiver.records.has(firstSnapshot.identity)).toBe(false);
+    } finally {
+      captureSqliteDatabaseAdmissions();
+    }
+  });
+
   it("installs a recreated scope when only the sender's latest publication is delivered", () => {
     const location = path.join(tempDirs.make("sqlite-recreated-scope-"), "proof.sqlite");
     const database = openDatabase("CREATE TABLE proof(value)", true, location);
@@ -248,6 +302,7 @@ describe("native SQLite schema snapshots and callbacks", () => {
     const receipts = createSqliteDatabaseWriteReceipts({
       admission: () => sender.records.get(snapshot!.identity),
       pathAdmission: () => sender.records.get(snapshot!.identity),
+      writeListeners: new WeakMap(),
       readRevision: () => 0,
       writer: () => sender.records.get(snapshot!.identity),
       suspended: () => false,
