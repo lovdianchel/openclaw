@@ -3,16 +3,11 @@ import { AsyncResource } from "node:async_hooks";
 import { expectDefined } from "@openclaw/normalization-core";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { awaitGateBeforeSettlement, withinTest } from "../../../test/helpers/promise.js";
-import { prepareAgentRunTerminalReply } from "../../agents/agent-run-terminal-reply.js";
 import {
   clearActiveEmbeddedRun,
   setActiveEmbeddedRun,
 } from "../../agents/embedded-agent-runner/runs.js";
-import {
-  createMissingReplyNotice,
-  MISSING_REPLY_NOTICE_TEXT,
-  resolveReplyCompletion,
-} from "../../agents/reply-completion.js";
+import { createMissingReplyNotice, resolveReplyCompletion } from "../../agents/reply-completion.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import type { PluginHookReplyDispatchEvent } from "../../plugins/hook-types.js";
 import { setActivePluginRegistry } from "../../plugins/runtime.js";
@@ -1485,11 +1480,7 @@ describe("dispatchReplyFromConfig", () => {
     const dispatcher = createDispatcher();
     const replyResolver = vi.fn(async (_ctx: MsgContext, opts?: GetReplyOptions) => {
       const runState = expectDefined(resolveReplyOperationRunState(opts), "reply run state");
-      const terminalReply = prepareAgentRunTerminalReply({}).terminalReply;
-      runState.replyCompletion = resolveReplyCompletion(
-        "optional",
-        terminalReply.disposition === "visible" ? "ready" : terminalReply.disposition,
-      );
+      runState.replyCompletion = resolveReplyCompletion("optional", "empty");
       return undefined;
     });
 
@@ -1514,18 +1505,12 @@ describe("dispatchReplyFromConfig", () => {
       });
 
       expect(result).toMatchObject({
-        queuedFinal: true,
+        queuedFinal: false,
         counts: { tool: 0, block: 0, final: 0 },
-        noVisibleReplyFallbackDelivered: true,
       });
+      expect(result.noVisibleReplyFallbackDelivered).toBeUndefined();
       expect(result.deliberateSilentTerminalReply).toBeUndefined();
-      expect(dispatcher.sendFinalReply).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          text: MISSING_REPLY_NOTICE_TEXT,
-          isError: true,
-          isStatusNotice: true,
-        }),
-      );
+      expect(dispatcher.sendFinalReply).not.toHaveBeenCalled();
       expect(replyResolver).toHaveBeenCalledTimes(1);
       expect(replyRunRegistry.get(sessionKey)).toBe(activeOperation);
     } finally {
@@ -1549,11 +1534,7 @@ describe("dispatchReplyFromConfig", () => {
     const replyResolver = vi.fn(async (_ctx: MsgContext, opts?: GetReplyOptions) => {
       expect(replyRunRegistry.get(sessionKey)).toBeUndefined();
       const runState = expectDefined(resolveReplyOperationRunState(opts), "reply run state");
-      const terminalReply = prepareAgentRunTerminalReply({}).terminalReply;
-      runState.replyCompletion = resolveReplyCompletion(
-        "optional",
-        terminalReply.disposition === "visible" ? "ready" : terminalReply.disposition,
-      );
+      runState.replyCompletion = resolveReplyCompletion("optional", "empty");
       return undefined;
     });
 
@@ -1578,18 +1559,12 @@ describe("dispatchReplyFromConfig", () => {
       });
 
       expect(result).toMatchObject({
-        queuedFinal: true,
+        queuedFinal: false,
         counts: { tool: 0, block: 0, final: 0 },
-        noVisibleReplyFallbackDelivered: true,
       });
+      expect(result.noVisibleReplyFallbackDelivered).toBeUndefined();
       expect(result.deliberateSilentTerminalReply).toBeUndefined();
-      expect(dispatcher.sendFinalReply).toHaveBeenCalledExactlyOnceWith(
-        expect.objectContaining({
-          text: MISSING_REPLY_NOTICE_TEXT,
-          isError: true,
-          isStatusNotice: true,
-        }),
-      );
+      expect(dispatcher.sendFinalReply).not.toHaveBeenCalled();
       expect(replyResolver).toHaveBeenCalledTimes(1);
       expect(replyRunRegistry.get(sessionKey)).toBeUndefined();
     } finally {

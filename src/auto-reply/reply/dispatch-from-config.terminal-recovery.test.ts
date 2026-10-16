@@ -334,7 +334,7 @@ describe("dispatchReplyFromConfig visible admission recovery", () => {
 
   it.each([
     ["group", true, true, "allow", "slack", true],
-    ["group", false, false, "allow", "slack", true],
+    ["group", false, false, "allow", "slack", false],
     ["direct", true, false, "allow", "discord", true],
     ["direct", false, false, "allow", "webchat", true],
   ] as const)(
@@ -411,7 +411,7 @@ describe("dispatchReplyFromConfig visible admission recovery", () => {
       expect(processedEvents).toEqual([
         expect.objectContaining({ outcome: "error", error: undefined }),
       ]);
-      if (origin !== surface) {
+      if (expectedFinal && origin !== surface) {
         expect(mocks.routeReply).toHaveBeenLastCalledWith(
           expect.objectContaining({
             channel: origin,

@@ -414,9 +414,8 @@ describe("prepareTerminalWithSettledTurnFinalization", () => {
       const attempt = createAttempt();
       const input = finalizationInput(attempt);
       Object.assign(input.terminalBase.runParams, {
-        trigger: "heartbeat",
-        terminalReplyExpectation: "optional",
-        allowEmptyAssistantReplyAsSilent: true,
+        trigger: "user",
+        terminalReplyExpectation: "required",
         sourceReplyDeliveryMode: "automatic",
       });
       backendMocks.runSettledFinalization.mockResolvedValue({
@@ -453,14 +452,13 @@ describe("prepareTerminalWithSettledTurnFinalization", () => {
     },
   );
 
-  it("does not accept optional authored silence after an original timeout", async () => {
+  it("does not accept authored silence after an original timeout", async () => {
     const attempt = createSettledProviderFailureAttempt();
     attempt.terminal = { kind: "timeout", phase: "prompt", source: "idle" };
     const input = finalizationInput(attempt);
     Object.assign(input.terminalBase.runParams, {
-      trigger: "heartbeat",
-      terminalReplyExpectation: "optional",
-      allowEmptyAssistantReplyAsSilent: true,
+      trigger: "user",
+      terminalReplyExpectation: "required",
       sourceReplyDeliveryMode: "automatic",
     });
     backendMocks.runSettledFinalization.mockResolvedValue({
@@ -489,7 +487,7 @@ describe("prepareTerminalWithSettledTurnFinalization", () => {
     { trigger: "heartbeat", expectation: "optional", notice: false },
     { trigger: "user", expectation: "result-required", notice: false },
   ] as const)(
-    "records failed $trigger/$expectation recovery without persisting a synthetic answer",
+    "settles empty $trigger/$expectation turns without persisting a synthetic answer",
     async ({ trigger, expectation, notice }) => {
       const attempt = settledSuccessfulAttempt();
       const emptyAssistant = buildEmbeddedRunnerAssistant({
@@ -510,8 +508,12 @@ describe("prepareTerminalWithSettledTurnFinalization", () => {
 
       const result = await prepareTerminalWithSettledTurnFinalization(input);
 
-      expect(backendMocks.runSettledFinalization).toHaveBeenCalledTimes(2);
-      expect(result.finalizationOutcome).toBe("failed");
+      expect(backendMocks.runSettledFinalization).toHaveBeenCalledTimes(
+        expectation === "optional" ? 0 : 2,
+      );
+      expect(result.finalizationOutcome).toBe(
+        expectation === "optional" ? "not-attempted" : "failed",
+      );
       expect(result.prepared.payloadsWithToolMedia ?? []).toEqual([]);
       expect(transcriptMocks.appendAssistantMirrorMessageByIdentity).not.toHaveBeenCalled();
       expect(result.attempt.assistantTexts).toEqual([]);
@@ -530,7 +532,11 @@ describe("prepareTerminalWithSettledTurnFinalization", () => {
       if (terminal.action !== "complete") {
         throw new Error("expected failed completion");
       }
-      expect(terminal.result.meta.error).toMatchObject({ kind: "incomplete_turn" });
+      if (expectation === "optional") {
+        expect(terminal.result.meta.error).toBeUndefined();
+      } else {
+        expect(terminal.result.meta.error).toMatchObject({ kind: "incomplete_turn" });
+      }
       if (notice) {
         expect(terminal.result.payloads).toEqual([
           {
@@ -546,7 +552,9 @@ describe("prepareTerminalWithSettledTurnFinalization", () => {
         expect(terminal.result.payloads).toBeUndefined();
       }
       expect(terminal.result.meta.terminalReply).toEqual({ disposition: "empty" });
-      expect(terminal.result.meta.finalAssistantVisibleText).toBeUndefined();
+      expect(terminal.result.meta.finalAssistantVisibleText).toBe(
+        expectation === "optional" ? "" : undefined,
+      );
       expect(terminal.result.meta.finalAssistantRawText).toBeUndefined();
     },
   );

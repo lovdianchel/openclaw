@@ -19,6 +19,7 @@ import { buildPreparedCliRunContext } from "../cli-runner.test-helpers.js";
 import { applyCliSessionBindingResult, getCliSessionBinding } from "../cli-session.js";
 import * as cliTranscript from "../command/attempt-execution.helpers.js";
 import { resolveDiagnosticModelResponse } from "../diagnostic-model-response.js";
+import { classifyEmbeddedAgentRunResultForModelFallback } from "../embedded-agent-runner/result-fallback-classifier.js";
 import {
   buildBlockedCliRunResult,
   buildCliDeliveredFailure,
@@ -121,6 +122,37 @@ describe("isCliBindingFlushed", () => {
     ).toBe(true);
     expect(probe).not.toHaveBeenCalled();
   });
+});
+
+describe("CLI empty result fallback", () => {
+  it.each(["required", "result-required", "optional"] as const)(
+    "preserves the %s reply obligation through classification",
+    (terminalReplyExpectation) => {
+      const context = buildPreparedCliRunContext({ provider: "claude-cli" });
+      context.params.terminalReplyExpectation = terminalReplyExpectation;
+      const output = { text: "" };
+      const result = buildCliRunResult({
+        context,
+        output,
+        preparedReply: prepareCliRunTerminalReply(context, output),
+        bindingFlushOk: true,
+        usedHistoryPrompt: false,
+        userTurnHandled: true,
+        sessionBindingDisabled: false,
+        preparedContextAgentMeta: {},
+      });
+      const classification = classifyEmbeddedAgentRunResultForModelFallback({
+        provider: "claude-cli",
+        model: "test-model",
+        result,
+      });
+      if (terminalReplyExpectation === "optional") {
+        expect(classification).toBeNull();
+      } else {
+        expect(classification).toMatchObject({ reason: "format", code: "empty_result" });
+      }
+    },
+  );
 });
 
 describe("CLI native continuity projection", () => {

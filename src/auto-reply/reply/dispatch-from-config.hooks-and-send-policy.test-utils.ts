@@ -460,7 +460,7 @@ describe("sendPolicy deny — suppress delivery, not processing (#53328)", () =>
       } satisfies OpenClawConfig,
       required: true,
     },
-  ])("reports empty admitted output for $name", async ({ cfg }) => {
+  ])("only reports empty admitted output when required for $name", async ({ cfg, required }) => {
     setNoAbort();
     const dispatcher = createDispatcher();
     const replyResolver = vi.fn(async () => undefined);
@@ -479,12 +479,16 @@ describe("sendPolicy deny — suppress delivery, not processing (#53328)", () =>
       replyResolver,
     });
 
-    expect(dispatcher.sendFinalReply).toHaveBeenCalledExactlyOnceWith({
-      text: NO_VISIBLE_REPLY_FALLBACK_TEXT,
-      isError: true,
-      isStatusNotice: true,
-    });
-    expect(result.noVisibleReplyFallbackDelivered).toBe(true);
+    if (required) {
+      expect(dispatcher.sendFinalReply).toHaveBeenCalledExactlyOnceWith({
+        text: NO_VISIBLE_REPLY_FALLBACK_TEXT,
+        isError: true,
+        isStatusNotice: true,
+      });
+    } else {
+      expect(dispatcher.sendFinalReply).not.toHaveBeenCalled();
+    }
+    expect(result.noVisibleReplyFallbackDelivered).toBe(required ? true : undefined);
     expect(result.deliberateSilentTerminalReply).toBeUndefined();
   });
 

@@ -26,7 +26,11 @@ import {
 import { resolveAuthProfileFailureReason } from "../embedded-agent-runner/run/auth-profile-failure-policy.js";
 import { mergeAttemptToolMediaPayloads } from "../embedded-agent-runner/run/tool-media-payloads.js";
 import { isFailoverError } from "../failover-error.js";
-import { createMissingReplyNotice, shouldDeliverMissingReplyNotice } from "../reply-completion.js";
+import {
+  createMissingReplyNotice,
+  resolveReplyExpectation,
+  shouldDeliverMissingReplyNotice,
+} from "../reply-completion.js";
 import { recordAgentCleanupFailure } from "../run-cleanup-timeout.js";
 import { CliAuthProfilePreparationError } from "./auth-profile-preparation-error.js";
 import { runCliCleanup } from "./cleanup.js";
@@ -581,6 +585,7 @@ export function buildCliRunResult(params: {
       ...(finalAssistantVisibleText ? { finalAssistantVisibleText } : {}),
       ...(rawText ? { finalAssistantRawText: rawText } : {}),
       terminalReply: preparedReply.terminalReply,
+      terminalReplyExpectation: resolveReplyExpectation(runParams),
       // An empty final message is recorded as "" so capture never falls back to
       // the cumulative raw text.
       ...(rawFinalText !== undefined && rawFinalText !== rawText

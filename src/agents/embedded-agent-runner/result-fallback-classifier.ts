@@ -4,6 +4,7 @@ import { classifyFailoverReason, isProviderRequestSizeCeilingError } from "../fa
 import type { FailoverReason } from "../failover/signal.js";
 import { GENERIC_EXTERNAL_RUN_FAILURE_TEXT } from "../failover/user-copy.js";
 import type { ModelFallbackResultClassification } from "../model-fallback-attempt.js";
+import { resolveReplyExpectation } from "../reply-completion.js";
 import {
   hasCommittedOutboundDeliveryEvidence,
   hasVisibleAgentPayload,
@@ -250,11 +251,12 @@ export function classifyEmbeddedAgentRunResultForModelFallback(params: {
     };
   }
 
-  // The producer marks an owed missing result as an error; a clean empty fact
-  // completes optional input without manufacturing another model turn.
+  // Only an explicitly optional turn may complete with an empty result.
   if (
     params.result.meta.terminalReply?.disposition === "silent" ||
-    (params.result.meta.terminalReply?.disposition === "empty" && !terminalError)
+    (params.result.meta.terminalReply?.disposition === "empty" &&
+      resolveReplyExpectation(params.result.meta) === "optional" &&
+      !terminalError)
   ) {
     return null;
   }

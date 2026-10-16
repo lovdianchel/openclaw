@@ -19,7 +19,7 @@ import type { McpConnectAction } from "../mcp-connect-action.js";
 import type { McpAppChannelView } from "../mcp-ui-resource.js";
 import type { FallbackAttempt } from "../model-fallback.types.js";
 import type { ModelRef } from "../model-ref-shared.js";
-import type { ReplyDeliveryState } from "../reply-completion.js";
+import type { ReplyDeliveryState, ReplyExpectation } from "../reply-completion.js";
 import type { AgentRuntimeCredentialSource } from "../runtime-plan/types.js";
 import type { NormalizedUsage } from "../usage.js";
 
@@ -186,6 +186,7 @@ export type EmbeddedAgentRunMeta = {
   /** An exact, successfully settled tool batch intentionally completed the turn without a reply. */
   intentionalTerminalCompletion?: "tool-batch";
   terminalReply?: AgentRunTerminalReplySnapshot;
+  terminalReplyExpectation?: ReplyExpectation;
   yielded?: boolean;
   /** Explicit user-facing waiting status supplied to sessions_yield. */
   yieldAcknowledgment?: string;

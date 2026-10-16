@@ -56,14 +56,16 @@ describe("Outcome/fallback runtime contract - embedded runtime fallback classifi
   });
 
   it.each([
-    ["optional", undefined, 1, 2],
+    ["optional", undefined, 1, 1],
+    ["optional", "empty", 1, 1],
+    ["optional", "reasoning-only", 1, 1],
     ["result-required", undefined, 1, 2],
     ["result-required", "empty", 3, 6],
     ["result-required", "reasoning-only", 3, 9],
     ["required", "empty", 3, 6],
     ["required", "reasoning-only", 3, 9],
   ] as const)(
-    "recovers an empty stop for %s replies with harness classification %s",
+    "settles an empty stop for %s replies with harness classification %s",
     async (expectation, classification, expectedModels, expectedRequests) => {
       const prompt = "The result is already incorporated. No new update.";
       const provenance = { kind: "inter_session" as const, sourceTool: "sessions_send" };
@@ -112,7 +114,9 @@ describe("Outcome/fallback runtime contract - embedded runtime fallback classifi
             );
             expect(terminal.result.payloads).toBeUndefined();
             expect(terminal.result.meta.terminalReply).toEqual({ disposition: "empty" });
-            expect(terminal.result.meta.finalAssistantVisibleText).toBeUndefined();
+            expect(terminal.result.meta.finalAssistantVisibleText).toBe(
+              expectation === "optional" ? "" : undefined,
+            );
             expect(terminal.result.meta.finalAssistantRawText).toBeUndefined();
             return terminal.result;
           }
@@ -131,14 +135,22 @@ describe("Outcome/fallback runtime contract - embedded runtime fallback classifi
 
       expect(run).toHaveBeenCalledTimes(expectedModels);
       expect(modelRequests).toBe(expectedRequests);
-      expect(result.model).toBe(classification ? "gpt-5.6-luna" : "gpt-5.6-sol");
-      expect(result.attempts).toHaveLength(classification ? 3 : 0);
-      expect(result.result.meta.error?.kind).toBe("incomplete_turn");
+      const fallbackExpected = expectation !== "optional" && classification !== undefined;
+      expect(result.model).toBe(fallbackExpected ? "gpt-5.6-luna" : "gpt-5.6-sol");
+      expect(result.attempts).toHaveLength(fallbackExpected ? 3 : 0);
+      expect(result.result.meta.error?.kind).toBe(
+        expectation === "optional" ? undefined : "incomplete_turn",
+      );
       expect(result.result.meta.terminalReply).toEqual({ disposition: "empty" });
-      expect(result.result.meta.finalAssistantVisibleText).toBeUndefined();
+      expect(result.result.meta.finalAssistantVisibleText).toBe(
+        expectation === "optional" ? "" : undefined,
+      );
       expect(result.result.meta.finalAssistantRawText).toBeUndefined();
       expect(result.result.payloads).toBeUndefined();
       expect(notices).toEqual([]);
+      if (!result.result.meta.error) {
+        return;
+      }
       const notice = await resolveTerminalAgentRunFailurePayload({
         result: result.result,
         run: {

@@ -651,6 +651,7 @@ async function completeEmbeddedRun(
         stopReason,
         agentHarnessResultClassification: input.attempt.agentHarnessResultClassification,
         terminalReply,
+        terminalReplyExpectation: resolveReplyExpectation(input.runParams),
         ...(error
           ? { error }
           : {

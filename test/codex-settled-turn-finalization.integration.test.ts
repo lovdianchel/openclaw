@@ -71,7 +71,7 @@ describe("registered Codex finalizer host silence contract", () => {
     input.terminalBase.activeErrorContext = { provider: params.provider, model: params.modelId };
     Object.assign(input.terminalBase.runParams, {
       trigger: "heartbeat",
-      terminalReplyExpectation: "optional",
+      terminalReplyExpectation: "required",
       sourceReplyDeliveryMode: "automatic",
     });
     return input;
@@ -90,10 +90,10 @@ describe("registered Codex finalizer host silence contract", () => {
   }
 
   it.each([
-    { text: " NO_REPLY\n", expectation: "optional", calls: 1 },
+    { text: " NO_REPLY\n", expectation: "required", calls: 1 },
     { text: "NO_REPLY", expectation: "required", calls: 1 },
     { text: "NO_REPLY", expectation: "result-required", calls: 2 },
-    { text: " ", expectation: "optional", calls: 2 },
+    { text: " ", expectation: "required", calls: 2 },
   ] as const)(
     "preserves the provider failure after $expectation $text output",
     async ({ text, expectation, calls }) => {
@@ -150,6 +150,22 @@ describe("registered Codex finalizer host silence contract", () => {
       expect(fixture.mirror).not.toHaveBeenCalled();
     },
   );
+
+  it("does not finalize an optional empty turn after settled tool work", async () => {
+    const input = await createInput();
+    input.terminalBase.runParams.terminalReplyExpectation = "optional";
+    const runAttempt = vi.spyOn(input.finalization.harness, "runAttempt");
+
+    const result = await prepareTerminalWithSettledTurnFinalization(input);
+
+    expect(result.finalizationOutcome).toBe("not-attempted");
+    expect(result.attempt).toBe(input.initial.attempt);
+    expect(result.terminalState).toBe(input.initial.terminalState);
+    expect(result.terminalState.outcome.error).toContain("Provider overloaded");
+    expect(fixture.runBounded).not.toHaveBeenCalled();
+    expect(runAttempt).not.toHaveBeenCalled();
+    expect(fixture.mirror).not.toHaveBeenCalled();
+  });
 
   it("replaces provider failure with the ordinary finalizer answer", async () => {
     const text = "The command completed and returned: settled.";

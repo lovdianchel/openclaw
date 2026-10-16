@@ -217,26 +217,31 @@ describe("resolveFollowupDeliveryDecision", () => {
   );
 
   it.each(["required", "optional"] as const)(
-    "reports an empty queued %s result",
+    "only reports an empty queued %s result when a reply is required",
     async (expectation) => {
-      const turn = createTurn();
+      const { replyOperation, failMock } = createMockReplyOperation();
+      const turn = createTurn({ operation: replyOperation });
       turn.queued.run.terminalReplyExpectation = expectation;
-      expect(
-        await resolveFollowupDeliveryDecision({
-          turn,
-          execution: createSettledExecution(),
-          accounting: createAccounting(),
-        }),
-      ).toMatchObject({
-        kind: "deliver",
-        payloads: [
-          {
-            text: "No answer was returned. Ask again if you still need one.",
-            isError: true,
-            isStatusNotice: true,
-          },
-        ],
+      const decision = await resolveFollowupDeliveryDecision({
+        turn,
+        execution: createSettledExecution(),
+        accounting: createAccounting(),
       });
+      expect(decision).toMatchObject(
+        expectation === "required"
+          ? {
+              kind: "deliver",
+              payloads: [
+                {
+                  text: "No answer was returned. Ask again if you still need one.",
+                  isError: true,
+                  isStatusNotice: true,
+                },
+              ],
+            }
+          : { kind: "suppress", reason: "silent" },
+      );
+      expect(failMock).toHaveBeenCalledTimes(expectation === "required" ? 1 : 0);
     },
   );
 
