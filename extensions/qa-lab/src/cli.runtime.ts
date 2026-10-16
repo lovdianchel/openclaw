@@ -7,6 +7,7 @@ import { parseBooleanValue, uniqueStrings } from "openclaw/plugin-sdk/string-coe
 import { resolveQaParityPackScenarioIds } from "./agentic-parity.js";
 import { createQaArtifactRunId } from "./artifact-run-id.js";
 import { runQaCharacterEval, type QaCharacterModelOptions } from "./character-eval.js";
+import { resolveRepoRelativeOutputDir } from "./cli-paths.js";
 import {
   resolveQaCommandOutputDir,
   writeQaCliReport,
